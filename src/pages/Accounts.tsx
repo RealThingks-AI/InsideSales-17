@@ -53,7 +53,7 @@ const Accounts = () => {
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-foreground">Accounts</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* View Toggle */}
               <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
                 <Button

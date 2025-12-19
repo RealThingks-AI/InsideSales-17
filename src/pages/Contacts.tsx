@@ -98,17 +98,7 @@ const Contacts = () => {
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-foreground">Contacts</h1>
             </div>
-            <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Columns</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+            <div className="flex items-center gap-3">
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
