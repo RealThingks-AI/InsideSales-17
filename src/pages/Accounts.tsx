@@ -115,18 +115,10 @@ const Accounts = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => setShowModal(true)}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Add Account</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button variant="outline" onClick={() => setShowModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Account
+          </Button>
             </div>
           </div>
         </div>

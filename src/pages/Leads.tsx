@@ -117,18 +117,10 @@ const Leads = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => setShowModal(true)}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Add Lead</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button variant="outline" onClick={() => setShowModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Lead
+          </Button>
             </div>
           </div>
         </div>

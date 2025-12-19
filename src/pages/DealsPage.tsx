@@ -393,22 +393,13 @@ const DealsPage = () => {
                 }}
               />
 
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleCreateDeal('Lead')}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>New Deal</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button 
+                variant="outline"
+                onClick={() => handleCreateDeal('Lead')}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Deal
+              </Button>
             </div>
           </div>
         </div>
