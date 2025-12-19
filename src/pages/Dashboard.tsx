@@ -10,7 +10,7 @@ const Dashboard = () => {
     isAdmin,
     loading
   } = useUserRole();
-  const availableYears = [2023, 2024, 2025, 2026];
+  const availableYears = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030];
   const currentYear = new Date().getFullYear();
   const defaultYear = availableYears.includes(currentYear) ? currentYear : 2025;
   const [selectedYear, setSelectedYear] = useState(defaultYear);
