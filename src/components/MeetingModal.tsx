@@ -740,7 +740,7 @@ export const MeetingModal = ({
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <User className="h-3 w-3" />
               {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'You'}
-              {user?.email}
+              {user?.email && <span className="text-muted-foreground/60">({user.email})</span>}
             </div>
           </div>
 
