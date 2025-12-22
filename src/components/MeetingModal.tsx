@@ -735,10 +735,13 @@ export const MeetingModal = ({
           </div>
 
           {/* Organizer Info */}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <User className="h-3 w-3" />
-            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'You'}
-            {user?.email && <span className="text-muted-foreground/60">({user.email})</span>}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Meeting Organizer</Label>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <User className="h-3 w-3" />
+              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'You'}
+              {user?.email && <span className="text-muted-foreground/60">({user.email})</span>}
+            </div>
           </div>
 
           {/* Timezone, Date, Time & Duration Row */}
