@@ -534,14 +534,27 @@ export const AccountModal = ({ open, onOpenChange, account, onSuccess, onCreated
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0 bg-popover z-50" align="start">
-                  <div className="p-3 max-h-[300px] overflow-y-auto">
-                    <div className="flex flex-wrap gap-2">
+                <PopoverContent className="w-[480px] p-0 bg-popover border shadow-lg z-50" align="start">
+                  <div className="p-4 max-h-[350px] overflow-y-auto">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">Select Tags</span>
+                      {selectedTags.length > 0 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setSelectedTags([])}
+                        >
+                          Clear all
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
                       {tagOptions.map((tag) => (
                         <Badge
                           key={tag}
                           variant={selectedTags.includes(tag) ? "default" : "outline"}
-                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                          className="cursor-pointer hover:opacity-80 transition-opacity justify-center py-1.5 text-xs"
                           onClick={() => toggleTag(tag)}
                         >
                           {tag}
