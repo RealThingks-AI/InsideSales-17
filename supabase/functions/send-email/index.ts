@@ -150,6 +150,23 @@ function wrapEmailContent(htmlBody: string): string {
   return `<div style="font-family: Calibri, Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.15; color: #000000;">${processed}</div>`;
 }
 
+// Rewrite links in email body to track clicks
+function rewriteLinksForTracking(html: string, emailHistoryId: string, supabaseUrl: string): string {
+  // Match href attributes with http/https URLs
+  const linkRegex = /href=["'](https?:\/\/[^"']+)["']/gi;
+  
+  return html.replace(linkRegex, (match, url) => {
+    // Don't rewrite unsubscribe links or our own tracking URLs
+    if (url.includes('unsubscribe') || url.includes('track-email')) {
+      return match;
+    }
+    
+    const encodedUrl = encodeURIComponent(url);
+    const trackingUrl = `${supabaseUrl}/functions/v1/track-email-click?id=${emailHistoryId}&url=${encodedUrl}`;
+    return `href="${trackingUrl}"`;
+  });
+}
+
 async function sendEmail(accessToken: string, emailRequest: EmailRequest, emailHistoryId: string): Promise<void> {
   const graphUrl = `https://graph.microsoft.com/v1.0/users/${emailRequest.from}/sendMail`;
 
@@ -168,9 +185,12 @@ async function sendEmail(accessToken: string, emailRequest: EmailRequest, emailH
   // Wrap the content with proper inline styles for email clients
   const wrappedBody = wrapEmailContent(emailRequest.body);
   
+  // Rewrite links for click tracking
+  const bodyWithClickTracking = rewriteLinksForTracking(wrappedBody, emailHistoryId, supabaseUrl);
+  
   // Embed tracking pixel in email body (append to HTML content)
   const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-  const bodyWithTracking = wrappedBody + trackingPixel;
+  const bodyWithTracking = bodyWithClickTracking + trackingPixel;
 
   const emailPayload: any = {
     message: {
