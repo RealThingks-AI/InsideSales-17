@@ -201,10 +201,10 @@ interface DealStakeholder {
 }
 
 const STAKEHOLDER_ROLES = [
-  { role: "budget_owner", label: "Budget Owner", color: "bg-blue-400", borderColor: "border-l-blue-400", badgeBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", cellBg: "bg-blue-50/40 dark:bg-blue-950/20" },
-  { role: "champion", label: "Champion", color: "bg-green-400", borderColor: "border-l-green-400", badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", cellBg: "bg-green-50/40 dark:bg-green-950/20" },
-  { role: "influencer", label: "Influencer", color: "bg-amber-400", borderColor: "border-l-amber-400", badgeBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", cellBg: "bg-amber-50/40 dark:bg-amber-950/20" },
-  { role: "objector", label: "Objector", color: "bg-red-400", borderColor: "border-l-red-400", badgeBg: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300", cellBg: "bg-red-50/40 dark:bg-red-950/20" },
+  { role: "budget_owner", label: "Budget Owner", color: "bg-blue-400", borderColor: "border-l-blue-400", badgeBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", nameColor: "text-blue-700 dark:text-blue-300" },
+  { role: "champion", label: "Champion", color: "bg-green-400", borderColor: "border-l-green-400", badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", nameColor: "text-green-700 dark:text-green-300" },
+  { role: "influencer", label: "Influencer", color: "bg-amber-400", borderColor: "border-l-amber-400", badgeBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", nameColor: "text-amber-700 dark:text-amber-300" },
+  { role: "objector", label: "Objector", color: "bg-red-400", borderColor: "border-l-red-400", badgeBg: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300", nameColor: "text-red-700 dark:text-red-300" },
 ] as const;
 
 // ── Inline add-dropdown for a single role ───────────────────────────────────
@@ -432,7 +432,7 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
 
         {/* Roles Grid */}
         <div className="grid grid-cols-2 gap-0">
-          {STAKEHOLDER_ROLES.map(({ role, label, borderColor, cellBg }, idx) => {
+          {STAKEHOLDER_ROLES.map(({ role, label, borderColor, nameColor }, idx) => {
             const roleStakeholders = stakeholders.filter(s => s.role === role);
             const excludeIds = stakeholders.map(s => s.contact_id);
             const hasContact = roleStakeholders.length > 0;
@@ -449,7 +449,6 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
                 className={cn(
                   "flex items-start min-w-0 px-2 py-1.5 border-l-[3px] transition-colors",
                   borderColor,
-                  cellBg,
                   idx < 2 && "border-b border-border/60",
                   idx % 2 === 0 && "border-r border-border/60"
                 )}
@@ -479,7 +478,7 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
                         key={sh.id}
                         className="group/row flex items-center gap-1.5 min-w-0 h-5"
                       >
-                        <span className="truncate text-xs font-medium leading-5 flex-1 min-w-0">
+                        <span className={cn("truncate text-xs font-medium leading-5 flex-1 min-w-0", nameColor)}>
                           {contactNames[sh.contact_id] || "…"}
                         </span>
 
