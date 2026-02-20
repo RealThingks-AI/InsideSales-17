@@ -449,8 +449,9 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
                 className={cn(
                   "flex items-start min-w-0 px-2 py-1.5 border-l-2 transition-colors hover:bg-muted/30",
                   borderColor,
-                  idx < 2 && "border-b border-border/30",
-                  idx % 2 === 0 && "border-r border-border/30"
+                  idx < 2 && "border-b border-border/50",
+                  idx % 2 === 0 && "border-r border-border/50",
+                  idx % 2 !== 0 && "bg-muted/10"
                 )}
               >
                 {/* Label */}
@@ -463,88 +464,99 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
 
                 {/* Contact name + inline actions */}
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1 pl-1">
-                  {roleStakeholders.map(sh => (
-                    <div
-                      key={sh.id}
-                      className="group/row flex items-center gap-1.5 min-w-0 h-5"
-                    >
-                      <span className="truncate text-xs font-medium leading-5 flex-1 min-w-0">
-                        {contactNames[sh.contact_id] || "…"}
-                      </span>
-
-                      {/* Info/Note button */}
-                      <Popover
-                        open={editingNote === sh.id}
-                        onOpenChange={(open) => {
-                          if (open) { setEditingNote(sh.id); setNoteText(sh.note || ""); }
-                          else { handleSaveNote(sh.id, noteText); }
-                        }}
-                      >
-                        <PopoverTrigger asChild>
-                          <button
-                            className={cn(
-                              "flex items-center justify-center w-6 h-6 rounded transition-all shrink-0",
-                              sh.note
-                                ? "text-primary hover:bg-primary/10"
-                                : "opacity-0 group-hover/row:opacity-60 hover:!opacity-100 text-muted-foreground hover:bg-accent/80"
-                            )}
-                            title={sh.note ? "View/Edit note" : "Add note"}
-                          >
-                            <Info className="h-3.5 w-3.5" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[480px] p-3 z-[200]" side="bottom" align="start" avoidCollisions={true}>
-                          <p className="text-[10px] text-muted-foreground mb-1.5">Each line becomes a bullet point</p>
-                          <Textarea
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Add notes about this contact…&#10;Each line = one bullet point"
-                            className="text-xs min-h-[80px] resize-none"
-                            autoFocus
-                          />
-                          {noteText && (
-                            <div className="mt-2 p-2 rounded-md bg-muted/40 border border-border/30">
-                              <p className="text-[10px] font-medium text-muted-foreground mb-1">Preview:</p>
-                              <ul className="space-y-0.5">
-                                {noteText.split("\n").filter(l => l.trim()).map((line, i) => (
-                                  <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                                    <span className="text-muted-foreground shrink-0">•</span>
-                                    <span>{line.trim()}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          <Button
-                            size="sm"
-                            className="mt-2 h-7 text-xs w-full"
-                            onClick={() => handleSaveNote(sh.id, noteText)}
-                          >
-                            Save
-                          </Button>
-                        </PopoverContent>
-                      </Popover>
-
-                      {/* Remove button */}
-                      <button
-                        className="opacity-0 group-hover/row:opacity-60 hover:!opacity-100 transition-opacity shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => promptRemove(sh)}
-                        title="Remove"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                  {roleStakeholders.length === 0 ? (
+                    <div className="h-5 flex items-center">
+                      <StakeholderAddDropdown
+                        contacts={allContacts}
+                        excludeIds={excludeIds}
+                        onAdd={(contact) => handleAddContact(role, contact)}
+                        cellRef={cellRef}
+                      />
                     </div>
-                  ))}
+                  ) : (
+                    roleStakeholders.map((sh, shIdx) => (
+                      <div
+                        key={sh.id}
+                        className="group/row flex items-center gap-1.5 min-w-0 h-5"
+                      >
+                        <span className="truncate text-xs font-medium leading-5 flex-1 min-w-0">
+                          {contactNames[sh.contact_id] || "…"}
+                        </span>
 
-                  {/* Always show add dropdown */}
-                  <div className="h-5 flex items-center">
-                    <StakeholderAddDropdown
-                      contacts={allContacts}
-                      excludeIds={excludeIds}
-                      onAdd={(contact) => handleAddContact(role, contact)}
-                      cellRef={cellRef}
-                    />
-                  </div>
+                        {/* Info/Note button */}
+                        <Popover
+                          open={editingNote === sh.id}
+                          onOpenChange={(open) => {
+                            if (open) { setEditingNote(sh.id); setNoteText(sh.note || ""); }
+                            else { handleSaveNote(sh.id, noteText); }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className={cn(
+                                "flex items-center justify-center w-6 h-6 rounded transition-all shrink-0",
+                                sh.note
+                                  ? "text-primary hover:bg-primary/10"
+                                  : "opacity-0 group-hover/row:opacity-60 hover:!opacity-100 text-muted-foreground hover:bg-accent/80"
+                              )}
+                              title={sh.note ? "View/Edit note" : "Add note"}
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[480px] p-3 z-[200]" side="bottom" align="start" avoidCollisions={true}>
+                            <p className="text-[10px] text-muted-foreground mb-1.5">Each line becomes a bullet point</p>
+                            <Textarea
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              placeholder="Add notes about this contact…&#10;Each line = one bullet point"
+                              className="text-xs min-h-[80px] resize-none"
+                              autoFocus
+                            />
+                            {noteText && (
+                              <div className="mt-2 p-2 rounded-md bg-muted/40 border border-border/30">
+                                <p className="text-[10px] font-medium text-muted-foreground mb-1">Preview:</p>
+                                <ul className="space-y-0.5">
+                                  {noteText.split("\n").filter(l => l.trim()).map((line, i) => (
+                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                      <span className="text-muted-foreground shrink-0">•</span>
+                                      <span>{line.trim()}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              className="mt-2 h-7 text-xs w-full"
+                              onClick={() => handleSaveNote(sh.id, noteText)}
+                            >
+                              Save
+                            </Button>
+                          </PopoverContent>
+                        </Popover>
+
+                        {/* Remove button */}
+                        <button
+                          className="opacity-0 group-hover/row:opacity-60 hover:!opacity-100 transition-opacity shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => promptRemove(sh)}
+                          title="Remove"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* Inline add button after last contact */}
+                        {shIdx === roleStakeholders.length - 1 && (
+                          <StakeholderAddDropdown
+                            contacts={allContacts}
+                            excludeIds={excludeIds}
+                            onAdd={(contact) => handleAddContact(role, contact)}
+                            cellRef={cellRef}
+                          />
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             );
