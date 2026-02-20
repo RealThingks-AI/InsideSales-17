@@ -29,8 +29,8 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  AlertDialogTitle } from
+"@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -201,11 +201,11 @@ interface DealStakeholder {
 }
 
 const STAKEHOLDER_ROLES = [
-  { role: "budget_owner", label: "Budget Owner", color: "bg-blue-400", borderColor: "border-l-blue-400", badgeBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", nameColor: "text-blue-700 dark:text-blue-300" },
-  { role: "champion", label: "Champion", color: "bg-green-400", borderColor: "border-l-green-400", badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", nameColor: "text-green-700 dark:text-green-300" },
-  { role: "influencer", label: "Influencer", color: "bg-amber-400", borderColor: "border-l-amber-400", badgeBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", nameColor: "text-amber-700 dark:text-amber-300" },
-  { role: "objector", label: "Objector", color: "bg-red-400", borderColor: "border-l-red-400", badgeBg: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300", nameColor: "text-red-700 dark:text-red-300" },
-] as const;
+{ role: "budget_owner", label: "Budget Owner", color: "bg-blue-400", borderColor: "border-l-blue-400", badgeBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", nameColor: "text-blue-700 dark:text-blue-300" },
+{ role: "champion", label: "Champion", color: "bg-green-400", borderColor: "border-l-green-400", badgeBg: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", nameColor: "text-green-700 dark:text-green-300" },
+{ role: "influencer", label: "Influencer", color: "bg-amber-400", borderColor: "border-l-amber-400", badgeBg: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", nameColor: "text-amber-700 dark:text-amber-300" },
+{ role: "objector", label: "Objector", color: "bg-red-400", borderColor: "border-l-red-400", badgeBg: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300", nameColor: "text-red-700 dark:text-red-300" }] as
+const;
 
 // ── Inline add-dropdown for a single role ───────────────────────────────────
 interface StakeholderAddDropdownProps {
@@ -216,7 +216,7 @@ interface StakeholderAddDropdownProps {
 }
 
 const normalize = (s: string) =>
-  s.toLowerCase().replace(/[-_.,()]/g, " ").replace(/\s+/g, " ").trim();
+s.toLowerCase().replace(/[-_.,()]/g, " ").replace(/\s+/g, " ").trim();
 
 const StakeholderAddDropdown = ({ contacts, excludeIds, onAdd, cellRef }: StakeholderAddDropdownProps) => {
   const [open, setOpen] = useState(false);
@@ -233,15 +233,15 @@ const StakeholderAddDropdown = ({ contacts, excludeIds, onAdd, cellRef }: Stakeh
   };
 
   const filtered = useMemo(() => {
-    const available = contacts.filter(c => !excludeIds.includes(c.id));
+    const available = contacts.filter((c) => !excludeIds.includes(c.id));
     if (!search) return available.slice(0, 80);
     const words = normalize(search).split(" ").filter(Boolean);
-    return available
-      .filter(c => {
-        const combined = normalize(`${c.contact_name || ""} ${c.company_name || ""} ${c.position || ""}`);
-        return words.every(w => combined.includes(w));
-      })
-      .slice(0, 80);
+    return available.
+    filter((c) => {
+      const combined = normalize(`${c.contact_name || ""} ${c.company_name || ""} ${c.position || ""}`);
+      return words.every((w) => combined.includes(w));
+    }).
+    slice(0, 80);
   }, [contacts, excludeIds, search]);
 
 
@@ -250,8 +250,8 @@ const StakeholderAddDropdown = ({ contacts, excludeIds, onAdd, cellRef }: Stakeh
       <PopoverTrigger asChild>
         <button
           className="flex items-center justify-center w-6 h-5 rounded hover:bg-accent/80 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          title="Add contact"
-        >
+          title="Add contact">
+
           <Plus className="h-4 w-4" />
         </button>
       </PopoverTrigger>
@@ -262,51 +262,51 @@ const StakeholderAddDropdown = ({ contacts, excludeIds, onAdd, cellRef }: Stakeh
         side="bottom"
         sideOffset={4}
         avoidCollisions={true}
-        onWheel={e => e.stopPropagation()}
-      >
+        onWheel={(e) => e.stopPropagation()}>
+
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search contacts…"
             value={search}
             onValueChange={setSearch}
-            className="h-8 text-xs"
-          />
+            className="h-8 text-xs" />
+
           <CommandList
             className="max-h-[180px] overflow-y-auto"
-            onWheel={e => { e.stopPropagation(); (e.currentTarget as HTMLElement).scrollTop += e.deltaY; }}
-          >
-            {filtered.length === 0 ? (
-              <div className="py-4 text-center text-xs text-muted-foreground">No contacts found.</div>
-            ) : (
-              <CommandGroup>
-                {filtered.map(c => (
-                  <CommandItem
-                    key={c.id}
-                    value={c.contact_name}
-                    onSelect={() => { onAdd(c); setOpen(false); setSearch(""); }}
-                    className="cursor-pointer py-1 px-2"
-                  >
+            onWheel={(e) => {e.stopPropagation();(e.currentTarget as HTMLElement).scrollTop += e.deltaY;}}>
+
+            {filtered.length === 0 ?
+            <div className="py-4 text-center text-xs text-muted-foreground">No contacts found.</div> :
+
+            <CommandGroup>
+                {filtered.map((c) =>
+              <CommandItem
+                key={c.id}
+                value={c.contact_name}
+                onSelect={() => {onAdd(c);setOpen(false);setSearch("");}}
+                className="cursor-pointer py-1 px-2">
+
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs font-medium truncate">{c.contact_name}</span>
-                      {(c.company_name || c.position) && (
-                        <span className="text-[10px] text-muted-foreground truncate">
+                      {(c.company_name || c.position) &&
+                  <span className="text-[10px] text-muted-foreground truncate">
                           {[c.company_name, c.position].filter(Boolean).join(" • ")}
                         </span>
-                      )}
+                  }
                     </div>
                   </CommandItem>
-                ))}
+              )}
               </CommandGroup>
-            )}
+            }
           </CommandList>
         </Command>
       </PopoverContent>
-    </Popover>
-  );
+    </Popover>);
+
 };
 
 // ── Stakeholders Section Component ──────────────────────────────────────────
-const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: ReturnType<typeof useQueryClient> }) => {
+const StakeholdersSection = ({ deal, queryClient }: {deal: Deal;queryClient: ReturnType<typeof useQueryClient>;}) => {
   const { user } = useAuth();
   const cellRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [editingNote, setEditingNote] = useState<string | null>(null);
@@ -327,11 +327,11 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
       let from = 0;
       const BATCH = 1000;
       while (true) {
-        const { data, error } = await supabase
-          .from("contacts")
-          .select("id, contact_name, company_name, position, email, phone_no, region, contact_owner, contact_source, industry, linkedin, website")
-          .order("contact_name", { ascending: true })
-          .range(from, from + BATCH - 1);
+        const { data, error } = await supabase.
+        from("contacts").
+        select("id, contact_name, company_name, position, email, phone_no, region, contact_owner, contact_source, industry, linkedin, website").
+        order("contact_name", { ascending: true }).
+        range(from, from + BATCH - 1);
         if (error || !data || data.length === 0) break;
         all.push(...data);
         if (data.length < BATCH) break;
@@ -346,20 +346,20 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
   const { data: stakeholders = [] } = useQuery({
     queryKey: ["deal-stakeholders", deal.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("deal_stakeholders")
-        .select("*")
-        .eq("deal_id", deal.id);
-      if (error) { console.error("Error fetching stakeholders:", error); return []; }
+      const { data, error } = await supabase.
+      from("deal_stakeholders").
+      select("*").
+      eq("deal_id", deal.id);
+      if (error) {console.error("Error fetching stakeholders:", error);return [];}
       return (data || []) as DealStakeholder[];
     },
-    enabled: !!deal.id,
+    enabled: !!deal.id
   });
 
   // Build contact name map from already-loaded contacts
   const contactNames = useMemo(() => {
     const map: Record<string, string> = {};
-    allContacts.forEach(c => { map[c.id] = c.contact_name; });
+    allContacts.forEach((c) => {map[c.id] = c.contact_name;});
     return map;
   }, [allContacts]);
 
@@ -368,9 +368,9 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
       deal_id: deal.id,
       contact_id: contact.id,
       role,
-      created_by: user?.id,
+      created_by: user?.id
     });
-    if (error) { console.error("Error adding stakeholder:", error); return; }
+    if (error) {console.error("Error adding stakeholder:", error);return;}
     queryClient.invalidateQueries({ queryKey: ["deal-stakeholders", deal.id] });
   };
 
@@ -399,10 +399,10 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
 
   // Notes summary data
   const stakeholdersWithNotes = useMemo(() => {
-    return stakeholders.filter(s => s.note).map(s => {
-      const roleDef = STAKEHOLDER_ROLES.find(r => r.role === s.role);
+    return stakeholders.filter((s) => s.note).map((s) => {
+      const roleDef = STAKEHOLDER_ROLES.find((r) => r.role === s.role);
       return { ...s, roleLabel: roleDef?.label || s.role, badgeBg: roleDef?.badgeBg || "", contactName: contactNames[s.contact_id] || "…" };
-    }).filter(s => {
+    }).filter((s) => {
       if (!noteSearch) return true;
       const q = noteSearch.toLowerCase();
       return s.contactName.toLowerCase().includes(q) || (s.note || "").toLowerCase().includes(q) || s.roleLabel.toLowerCase().includes(q);
@@ -420,116 +420,116 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
             <span className="text-xs font-semibold text-foreground">Stakeholders</span>
           </div>
           <Button
-            variant="ghost"
-            size="sm"
-            className={cn("h-6 px-2 text-[10px] gap-1", showNotesSummary && "bg-accent")}
-            onClick={() => { setShowNotesSummary(!showNotesSummary); setNoteSearch(""); }}
-          >
+              variant="ghost"
+              size="sm"
+              className={cn("h-6 px-2 text-[10px] gap-1", showNotesSummary && "bg-accent")}
+              onClick={() => {setShowNotesSummary(!showNotesSummary);setNoteSearch("");}}>
+
             <FileText className="h-3.5 w-3.5" />
-            Notes {stakeholders.filter(s => s.note).length > 0 && `(${stakeholders.filter(s => s.note).length})`}
+            Notes {stakeholders.filter((s) => s.note).length > 0 && `(${stakeholders.filter((s) => s.note).length})`}
           </Button>
         </div>
 
         {/* Roles Grid */}
         <div className="grid grid-cols-2 gap-0">
           {STAKEHOLDER_ROLES.map(({ role, label, borderColor, nameColor }, idx) => {
-            const roleStakeholders = stakeholders.filter(s => s.role === role);
-            const excludeIds = stakeholders.map(s => s.contact_id);
-            const hasContact = roleStakeholders.length > 0;
+              const roleStakeholders = stakeholders.filter((s) => s.role === role);
+              const excludeIds = stakeholders.map((s) => s.contact_id);
+              const hasContact = roleStakeholders.length > 0;
 
-            const getCellRef = (el: HTMLDivElement | null) => {
-              cellRefs.current[role] = el;
-            };
-            const cellRef = { get current() { return cellRefs.current[role] ?? null; } } as React.RefObject<HTMLDivElement>;
+              const getCellRef = (el: HTMLDivElement | null) => {
+                cellRefs.current[role] = el;
+              };
+              const cellRef = { get current() {return cellRefs.current[role] ?? null;} } as React.RefObject<HTMLDivElement>;
 
-            return (
-              <div
-                key={role}
-                ref={getCellRef}
-                className={cn(
-                  "flex items-start min-w-0 px-2 py-1.5 border-l-[3px] transition-colors",
-                  borderColor,
-                  idx < 2 && "border-b border-border/60",
-                  idx % 2 === 0 && "border-r border-border/60"
-                )}
-              >
+              return (
+                <div
+                  key={role}
+                  ref={getCellRef}
+                  className={cn(
+                    "flex items-start min-w-0 px-2 py-1.5 border-l-[3px] transition-colors",
+                    borderColor,
+                    idx < 2 && "border-b border-border/60",
+                    idx % 2 === 0 && "border-r border-border/60"
+                  )}>
+
                 {/* Label */}
                 <span
-                  className="text-xs font-medium text-muted-foreground shrink-0 pt-0.5 leading-5 whitespace-nowrap"
-                  style={{ width: "28%" }}
-                >
+                    className="text-xs font-medium text-muted-foreground shrink-0 pt-0.5 leading-5 whitespace-nowrap"
+                    style={{ width: "28%" }}>
+
                   {label} :
                 </span>
 
                 {/* Contact name + inline actions */}
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1 pl-1">
-                  {roleStakeholders.length === 0 ? (
+                  {roleStakeholders.length === 0 ?
                     <div className="h-5 flex items-center">
                       <StakeholderAddDropdown
                         contacts={allContacts}
                         excludeIds={excludeIds}
                         onAdd={(contact) => handleAddContact(role, contact)}
-                        cellRef={cellRef}
-                      />
-                    </div>
-                  ) : (
-                    roleStakeholders.map((sh, shIdx) => (
-                      <div
-                        key={sh.id}
-                        className="group/row flex items-center gap-1.5 min-w-0 h-5"
-                      >
+                        cellRef={cellRef} />
+
+                    </div> :
+
+                    roleStakeholders.map((sh, shIdx) =>
+                    <div
+                      key={sh.id}
+                      className="group/row flex items-center gap-1.5 min-w-0 h-5">
+
                         <span className={cn("truncate text-xs font-medium leading-5 flex-1 min-w-0", nameColor)}>
                           {contactNames[sh.contact_id] || "…"}
                         </span>
 
                         {/* Info/Note button */}
                         <Popover
-                          open={editingNote === sh.id}
-                          onOpenChange={(open) => {
-                            if (open) { setEditingNote(sh.id); setNoteText(sh.note || ""); }
-                            else { handleSaveNote(sh.id, noteText); }
-                          }}
-                        >
+                        open={editingNote === sh.id}
+                        onOpenChange={(open) => {
+                          if (open) {setEditingNote(sh.id);setNoteText(sh.note || "");} else
+                          {handleSaveNote(sh.id, noteText);}
+                        }}>
+
                           <PopoverTrigger asChild>
                             <button
-                              className={cn(
-                                "flex items-center justify-center w-6 h-6 rounded transition-all shrink-0",
-                                sh.note
-                                  ? "text-primary hover:bg-primary/10"
-                                  : "opacity-0 group-hover/row:opacity-60 hover:!opacity-100 text-muted-foreground hover:bg-accent/80"
-                              )}
-                              title={sh.note ? "View/Edit note" : "Add note"}
-                            >
+                            className={cn(
+                              "flex items-center justify-center w-6 h-6 rounded transition-all shrink-0",
+                              sh.note ?
+                              "text-primary hover:bg-primary/10" :
+                              "opacity-0 group-hover/row:opacity-60 hover:!opacity-100 text-muted-foreground hover:bg-accent/80"
+                            )}
+                            title={sh.note ? "View/Edit note" : "Add note"}>
+
                               <Info className="h-3.5 w-3.5" />
                             </button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[480px] p-3 z-[200]" side="bottom" align="start" avoidCollisions={true}>
                             <p className="text-[10px] text-muted-foreground mb-1.5">Each line becomes a bullet point</p>
                             <Textarea
-                              value={noteText}
-                              onChange={(e) => setNoteText(e.target.value)}
-                              placeholder="Add notes about this contact…&#10;Each line = one bullet point"
-                              className="text-xs min-h-[80px] resize-none"
-                              autoFocus
-                            />
-                            {noteText && (
-                              <div className="mt-2 p-2 rounded-md bg-muted/40 border border-border/30">
+                            value={noteText}
+                            onChange={(e) => setNoteText(e.target.value)}
+                            placeholder="Add notes about this contact…&#10;Each line = one bullet point"
+                            className="text-xs min-h-[80px] resize-none"
+                            autoFocus />
+
+                            {noteText &&
+                          <div className="mt-2 p-2 rounded-md bg-muted/40 border border-border/30">
                                 <p className="text-[10px] font-medium text-muted-foreground mb-1">Preview:</p>
                                 <ul className="space-y-0.5">
-                                  {noteText.split("\n").filter(l => l.trim()).map((line, i) => (
-                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                  {noteText.split("\n").filter((l) => l.trim()).map((line, i) =>
+                              <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
                                       <span className="text-muted-foreground shrink-0">•</span>
                                       <span>{line.trim()}</span>
                                     </li>
-                                  ))}
+                              )}
                                 </ul>
                               </div>
-                            )}
+                          }
                             <Button
-                              size="sm"
-                              className="mt-2 h-7 text-xs w-full"
-                              onClick={() => handleSaveNote(sh.id, noteText)}
-                            >
+                            size="sm"
+                            className="mt-2 h-7 text-xs w-full"
+                            onClick={() => handleSaveNote(sh.id, noteText)}>
+
                               Save
                             </Button>
                           </PopoverContent>
@@ -537,75 +537,75 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
 
                         {/* Remove button */}
                         <button
-                          className="opacity-0 group-hover/row:opacity-60 hover:!opacity-100 transition-opacity shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => promptRemove(sh)}
-                          title="Remove"
-                        >
+                        className="opacity-0 group-hover/row:opacity-60 hover:!opacity-100 transition-opacity shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => promptRemove(sh)}
+                        title="Remove">
+
                           <X className="h-3.5 w-3.5" />
                         </button>
 
                         {/* Inline add button after last contact */}
-                        {shIdx === roleStakeholders.length - 1 && (
-                          <StakeholderAddDropdown
-                            contacts={allContacts}
-                            excludeIds={excludeIds}
-                            onAdd={(contact) => handleAddContact(role, contact)}
-                            cellRef={cellRef}
-                          />
-                        )}
+                        {shIdx === roleStakeholders.length - 1 &&
+                      <StakeholderAddDropdown
+                        contacts={allContacts}
+                        excludeIds={excludeIds}
+                        onAdd={(contact) => handleAddContact(role, contact)}
+                        cellRef={cellRef} />
+
+                      }
                       </div>
-                    ))
-                  )}
+                    )
+                    }
                 </div>
-              </div>
-            );
-          })}
+              </div>);
+
+            })}
         </div>
 
         {/* Notes Summary Panel */}
-        {showNotesSummary && (
+        {showNotesSummary &&
           <div className="border-t border-border/40 p-2 space-y-1.5">
-            <Input
-              placeholder="Search notes…"
-              value={noteSearch}
-              onChange={(e) => setNoteSearch(e.target.value)}
-              className="h-7 text-xs"
-            />
-            {stakeholdersWithNotes.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-2">
-                {stakeholders.filter(s => s.note).length === 0 ? "No stakeholder notes yet." : "No matching notes."}
-              </p>
-            ) : (
-              <div className="space-y-1 max-h-[140px] overflow-y-auto">
-                {stakeholdersWithNotes.map(s => (
-                  <div key={s.id} className="flex items-start gap-2 p-1.5 rounded-md bg-muted/30 border border-border/30">
+            
+
+
+
+
+
+            {stakeholdersWithNotes.length === 0 ?
+            <p className="text-xs text-muted-foreground text-center py-2">
+                {stakeholders.filter((s) => s.note).length === 0 ? "No stakeholder notes yet." : "No matching notes."}
+              </p> :
+
+            <div className="space-y-1 max-h-[140px] overflow-y-auto">
+                {stakeholdersWithNotes.map((s) =>
+              <div key={s.id} className="flex items-start gap-2 p-1.5 rounded-md bg-muted/30 border border-border/30">
                     <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0 h-4 shrink-0", s.badgeBg)}>
                       {s.roleLabel}
                     </Badge>
                     <div className="min-w-0 flex-1">
                       <span className="text-xs font-medium">{s.contactName}</span>
                       <ul className="mt-0.5 space-y-0">
-                        {(s.note || "").split("\n").filter(l => l.trim()).map((line, i) => (
-                          <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                        {(s.note || "").split("\n").filter((l) => l.trim()).map((line, i) =>
+                    <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
                             <span className="shrink-0">•</span>
                             <span>{line.trim()}</span>
                           </li>
-                        ))}
+                    )}
                       </ul>
                     </div>
                   </div>
-                ))}
+              )}
               </div>
-            )}
+            }
           </div>
-        )}
+          }
       </div>
     </div>
 
     {/* Confirmation Dialog for Remove/Replace */}
     <AlertDialog open={confirmDialog.open} onOpenChange={(open) => {
-      if (!open) setConfirmDialog({ open: false, stakeholder: null });
-    }}>
+        if (!open) setConfirmDialog({ open: false, stakeholder: null });
+      }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
@@ -617,40 +617,40 @@ const StakeholdersSection = ({ deal, queryClient }: { deal: Deal; queryClient: R
               <p>
                 Are you sure you want to remove "{contactNames[confirmDialog.stakeholder?.contact_id || ""] || "this contact"}" from this deal?
               </p>
-              {confirmDialog.stakeholder?.note && (
+              {confirmDialog.stakeholder?.note &&
                 <div className="rounded-md border border-border bg-muted/50 p-3">
                   <p className="text-xs font-medium text-foreground mb-1">Existing Note:</p>
                   <ul className="space-y-0.5">
-                    {confirmDialog.stakeholder.note.split("\n").filter(l => l.trim()).map((line, i) => (
-                      <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                    {confirmDialog.stakeholder.note.split("\n").filter((l) => l.trim()).map((line, i) =>
+                    <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
                         <span className="shrink-0">•</span>
                         <span>{line.trim()}</span>
                       </li>
-                    ))}
+                    )}
                   </ul>
                 </div>
-              )}
-              {confirmDialog.stakeholder?.note && (
+                }
+              {confirmDialog.stakeholder?.note &&
                 <p className="text-xs text-destructive font-medium">
                   ⚠ The note for this contact will be permanently removed.
                 </p>
-              )}
+                }
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleConfirmAction}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
+              onClick={handleConfirmAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+
             Remove
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    </>
-  );
+    </>);
+
 };
 
 export const DealExpandedPanel = ({
