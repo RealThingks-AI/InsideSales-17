@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useCampaignCommunications, useCampaignContacts, useCampaignAccounts } from '@/hooks/useCampaigns';
+import { useCampaignCommunications, useCampaignContacts, useCampaignAccounts, useCampaignEmailTemplates } from '@/hooks/useCampaigns';
 import { useUserDisplayNames } from '@/hooks/useUserDisplayNames';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Mail, Phone, Linkedin, Calendar, RefreshCw } from 'lucide-react';
+import { Plus, Mail, Phone, Linkedin, Calendar, RefreshCw, Send } from 'lucide-react';
 import { COMMUNICATION_TYPES, EMAIL_TYPES, EMAIL_STATUSES, CALL_OUTCOMES, LINKEDIN_STATUSES } from '@/types/campaign';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const typeIcons: Record<string, any> = {
   Email: Mail,
@@ -28,7 +31,12 @@ export function CampaignOutreachTab({ campaignId }: Props) {
   const { query, addCommunication } = useCampaignCommunications(campaignId);
   const contactsQuery = useCampaignContacts(campaignId);
   const accountsQuery = useCampaignAccounts(campaignId);
+  const templatesQuery = useCampaignEmailTemplates(campaignId);
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [logOpen, setLogOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const [form, setForm] = useState({
     communication_type: 'Email',
     contact_id: '',
@@ -42,8 +50,14 @@ export function CampaignOutreachTab({ campaignId }: Props) {
     notes: '',
     outcome: '',
   });
+  const [sendForm, setSendForm] = useState({
+    contact_id: '',
+    account_id: '',
+    subject: '',
+    body: '',
+    template_id: '',
+  });
 
-  // Collect owner IDs from communications for display name resolution
   const ownerIds = [...new Set((query.data || []).filter(c => c.owner || c.created_by).map(c => c.owner || c.created_by).filter(Boolean) as string[])];
   const { displayNames } = useUserDisplayNames(ownerIds);
 
@@ -69,14 +83,89 @@ export function CampaignOutreachTab({ campaignId }: Props) {
 
   const contacts = contactsQuery.query.data || [];
   const accounts = accountsQuery.query.data || [];
+  const templates = templatesQuery.query.data || [];
+
+  const openSendDialog = (templateId?: string) => {
+    if (templateId) {
+      const t = templates.find(t => t.id === templateId);
+      if (t) {
+        setSendForm({ contact_id: '', account_id: '', subject: t.subject || '', body: t.body || '', template_id: templateId });
+      }
+    } else {
+      setSendForm({ contact_id: '', account_id: '', subject: '', body: '', template_id: '' });
+    }
+    setSendOpen(true);
+  };
+
+  const handleTemplateChange = (templateId: string) => {
+    const t = templates.find(t => t.id === templateId);
+    if (t) {
+      setSendForm(f => ({ ...f, template_id: templateId, subject: t.subject || '', body: t.body || '' }));
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!sendForm.contact_id || !sendForm.subject || !sendForm.body) {
+      toast({ title: 'Please fill in contact, subject and body', variant: 'destructive' });
+      return;
+    }
+
+    const contact = contacts.find(c => c.contact_id === sendForm.contact_id);
+    const recipientEmail = contact?.contacts?.email;
+    if (!recipientEmail) {
+      toast({ title: 'Selected contact has no email address', variant: 'destructive' });
+      return;
+    }
+
+    setSending(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-campaign-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          recipientEmail,
+          recipientName: contact?.contacts?.contact_name || '',
+          subject: sendForm.subject,
+          body: sendForm.body,
+          contactId: sendForm.contact_id,
+          accountId: sendForm.account_id || null,
+          campaignId,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to send email');
+
+      toast({ title: 'Email sent successfully' });
+      setSendOpen(false);
+      // Refresh communications list
+      contactsQuery.query.refetch();
+    } catch (err: any) {
+      toast({ title: 'Error sending email', description: err.message, variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-foreground">Communications ({query.data?.length || 0})</span>
-        <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}>
-          <Plus className="h-3 w-3 mr-1" /> Log Communication
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => openSendDialog()}>
+            <Send className="h-3 w-3 mr-1" /> Send Email
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}>
+            <Plus className="h-3 w-3 mr-1" /> Log Communication
+          </Button>
+        </div>
       </div>
 
       {!query.data?.length ? (
@@ -123,6 +212,70 @@ export function CampaignOutreachTab({ campaignId }: Props) {
         </Table>
       )}
 
+      {/* Send Email Dialog */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Send Campaign Email</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Contact *</Label>
+                <Select value={sendForm.contact_id} onValueChange={v => setSendForm(f => ({ ...f, contact_id: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Select contact" /></SelectTrigger>
+                  <SelectContent>
+                    {contacts.filter(c => c.contacts?.email).map(c => (
+                      <SelectItem key={c.contact_id} value={c.contact_id}>
+                        {c.contacts?.contact_name || c.contact_id}
+                        <span className="text-muted-foreground ml-1 text-xs">({c.contacts?.email})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Account</Label>
+                <Select value={sendForm.account_id} onValueChange={v => setSendForm(f => ({ ...f, account_id: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Optional" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {accounts.map(a => (
+                      <SelectItem key={a.account_id} value={a.account_id}>{a.accounts?.account_name || a.account_id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {templates.length > 0 && (
+              <div>
+                <Label>Email Template</Label>
+                <Select value={sendForm.template_id} onValueChange={handleTemplateChange}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="Choose template (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label>Subject *</Label>
+              <Input value={sendForm.subject} onChange={e => setSendForm(f => ({ ...f, subject: e.target.value }))} className="h-9" />
+            </div>
+            <div>
+              <Label>Body *</Label>
+              <Textarea value={sendForm.body} onChange={e => setSendForm(f => ({ ...f, body: e.target.value }))} rows={6} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
+            <Button variant="outline" onClick={() => setSendOpen(false)}>Cancel</Button>
+            <Button onClick={handleSendEmail} disabled={sending || !sendForm.contact_id || !sendForm.subject || !sendForm.body}>
+              <Send className="h-3 w-3 mr-1" />
+              {sending ? 'Sending...' : 'Send Email'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Log Communication Dialog */}
       <Dialog open={logOpen} onOpenChange={setLogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Log Communication</DialogTitle></DialogHeader>
@@ -211,7 +364,7 @@ export function CampaignOutreachTab({ campaignId }: Props) {
               </>
             )}
 
-            {(form.communication_type === 'Email') && (
+            {form.communication_type === 'Email' && (
               <div>
                 <Label>Email Body</Label>
                 <Textarea value={form.body} onChange={e => set('body', e.target.value)} rows={3} placeholder="Email body content..." />
