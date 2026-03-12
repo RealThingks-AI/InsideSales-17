@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useCampaignContacts, useCampaignAccounts } from '@/hooks/useCampaigns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ export function CampaignContactsTab({ campaignId }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [positionFilter, setPositionFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [convertContact, setConvertContact] = useState<CampaignContact | null>(null);
 
@@ -38,29 +39,34 @@ export function CampaignContactsTab({ campaignId }: Props) {
   });
 
   const existingIds = new Set((query.data || []).map(c => c.contact_id));
+
+  // Extract unique positions for filter
+  const positions = useMemo(() => {
+    const allContacts = allContactsQuery.data || [];
+    return [...new Set(allContacts.map(c => c.position).filter(Boolean))].sort() as string[];
+  }, [allContactsQuery.data]);
+
   const availableContacts = (allContactsQuery.data || []).filter(c => {
     if (existingIds.has(c.id)) return false;
     if (!c.contact_name.toLowerCase().includes(contactSearch.toLowerCase())) return false;
     if (accountFilter !== 'all') {
-      // Filter by company_name matching the selected account
       const account = campaignAccounts.find(a => a.account_id === accountFilter);
       if (account && c.company_name?.toLowerCase() !== account.accounts?.account_name?.toLowerCase()) return false;
     }
+    if (positionFilter !== 'all' && c.position !== positionFilter) return false;
     return true;
   });
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
 
   const handleBulkAdd = async () => {
-    const ids = Array.from(selectedIds);
-    for (const contactId of ids) {
+    for (const contactId of Array.from(selectedIds)) {
       await addContact.mutateAsync({ contactId });
     }
     setSelectedIds(new Set());
@@ -72,11 +78,18 @@ export function CampaignContactsTab({ campaignId }: Props) {
     setAddOpen(false);
   };
 
+  const resetFilters = () => {
+    setSelectedIds(new Set());
+    setContactSearch('');
+    setAccountFilter('all');
+    setPositionFilter('all');
+  };
+
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-foreground">Target Contacts ({query.data?.length || 0})</span>
-        <Popover open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) { setSelectedIds(new Set()); setContactSearch(''); setAccountFilter('all'); } }}>
+        <Popover open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) resetFilters(); }}>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline"><Plus className="h-3 w-3 mr-1" /> Add Contacts</Button>
           </PopoverTrigger>
@@ -86,9 +99,11 @@ export function CampaignContactsTab({ campaignId }: Props) {
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                 <Input placeholder="Search contacts..." value={contactSearch} onChange={e => setContactSearch(e.target.value)} className="pl-7 h-8 text-xs" />
               </div>
+            </div>
+            <div className="flex gap-2 mb-2">
               {campaignAccounts.length > 0 && (
                 <Select value={accountFilter} onValueChange={setAccountFilter}>
-                  <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Account" /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Account" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Accounts</SelectItem>
                     {campaignAccounts.map(a => (
@@ -97,27 +112,26 @@ export function CampaignContactsTab({ campaignId }: Props) {
                   </SelectContent>
                 </Select>
               )}
+              {positions.length > 0 && (
+                <Select value={positionFilter} onValueChange={setPositionFilter}>
+                  <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Position" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Positions</SelectItem>
+                    {positions.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="max-h-56 overflow-y-auto space-y-0.5">
               {availableContacts.map(c => (
-                <label
-                  key={c.id}
-                  className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selectedIds.has(c.id)}
-                    onCheckedChange={() => toggleSelect(c.id)}
-                    className="h-3.5 w-3.5"
-                  />
+                <label key={c.id} className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent cursor-pointer">
+                  <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} className="h-3.5 w-3.5" />
                   <span className="truncate flex-1">
                     {c.contact_name}
                     {c.position && <span className="text-muted-foreground ml-1">· {c.position}</span>}
                     {c.company_name && <span className="text-muted-foreground ml-1">@ {c.company_name}</span>}
                   </span>
-                  <button
-                    className="text-primary text-[10px] font-medium shrink-0 hover:underline"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSingleAdd(c.id); }}
-                  >
+                  <button className="text-primary text-[10px] font-medium shrink-0 hover:underline" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSingleAdd(c.id); }}>
                     Add
                   </button>
                 </label>
@@ -127,9 +141,7 @@ export function CampaignContactsTab({ campaignId }: Props) {
             {selectedIds.size > 0 && (
               <div className="flex items-center justify-between border-t border-border mt-2 pt-2 px-1">
                 <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
-                <Button size="sm" className="h-7 text-xs" onClick={handleBulkAdd} disabled={addContact.isPending}>
-                  Add Selected
-                </Button>
+                <Button size="sm" className="h-7 text-xs" onClick={handleBulkAdd} disabled={addContact.isPending}>Add Selected</Button>
               </div>
             )}
           </PopoverContent>
@@ -184,13 +196,7 @@ export function CampaignContactsTab({ campaignId }: Props) {
                 <TableCell>
                   <div className="flex items-center gap-1">
                     {(cc.stage === 'Responded' || cc.stage === 'Qualified') && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-primary"
-                        title="Convert to Deal"
-                        onClick={() => setConvertContact(cc)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" title="Convert to Deal" onClick={() => setConvertContact(cc)}>
                         <ArrowRightCircle className="h-4 w-4" />
                       </Button>
                     )}

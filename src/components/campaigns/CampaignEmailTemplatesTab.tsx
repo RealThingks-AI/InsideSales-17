@@ -8,18 +8,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Send } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { EMAIL_TYPES, AUDIENCE_SEGMENTS } from '@/types/campaign';
 
 interface Props {
   campaignId: string;
+  onUseTemplate?: (templateId: string) => void;
 }
 
 const emptyForm = { template_name: '', subject: '', body: '', email_type: '', audience_segment: '' };
 
-export function CampaignEmailTemplatesTab({ campaignId }: Props) {
+export function CampaignEmailTemplatesTab({ campaignId, onUseTemplate }: Props) {
   const { query, createTemplate, updateTemplate, deleteTemplate } = useCampaignEmailTemplates(campaignId);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export function CampaignEmailTemplatesTab({ campaignId }: Props) {
               <TableHead>Email Type</TableHead>
               <TableHead>Audience</TableHead>
               <TableHead>Subject</TableHead>
-              <TableHead className="w-20"></TableHead>
+              <TableHead className="w-28"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -78,6 +79,11 @@ export function CampaignEmailTemplatesTab({ campaignId }: Props) {
                 <TableCell className="text-sm truncate max-w-[200px]">{t.subject || '—'}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
+                    {onUseTemplate && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" title="Use Template" onClick={() => onUseTemplate(t.id)}>
+                        <Send className="h-3 w-3" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(t)}><Pencil className="h-3 w-3" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(t.id)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
