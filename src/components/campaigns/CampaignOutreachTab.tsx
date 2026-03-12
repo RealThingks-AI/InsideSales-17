@@ -29,7 +29,7 @@ interface Props {
   onTemplatePicked?: () => void;
 }
 
-export function CampaignOutreachTab({ campaignId }: Props) {
+export function CampaignOutreachTab({ campaignId, initialTemplateId, onTemplatePicked }: Props) {
   const { query, addCommunication } = useCampaignCommunications(campaignId);
   const contactsQuery = useCampaignContacts(campaignId);
   const accountsQuery = useCampaignAccounts(campaignId);
