@@ -25,6 +25,8 @@ const typeIcons: Record<string, any> = {
 
 interface Props {
   campaignId: string;
+  initialTemplateId?: string | null;
+  onTemplatePicked?: () => void;
 }
 
 export function CampaignOutreachTab({ campaignId }: Props) {
