@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +22,19 @@ interface Props {
 
 export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+
+  const handleUseTemplate = useCallback((templateId: string) => {
+    setPendingTemplateId(templateId);
+    setActiveTab('outreach');
+  }, []);
+
+  // Once outreach tab renders, it picks up pendingTemplateId
+  const handleOutreachMounted = useCallback(() => {
+    const id = pendingTemplateId;
+    setPendingTemplateId(null);
+    return id;
+  }, [pendingTemplateId]);
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -104,11 +117,11 @@ export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
           </TabsContent>
 
           <TabsContent value="outreach" className="mt-0">
-            <CampaignOutreachTab campaignId={campaign.id} />
+            <CampaignOutreachTab campaignId={campaign.id} initialTemplateId={pendingTemplateId} onTemplatePicked={() => setPendingTemplateId(null)} />
           </TabsContent>
 
           <TabsContent value="templates" className="mt-0">
-            <CampaignEmailTemplatesTab campaignId={campaign.id} />
+            <CampaignEmailTemplatesTab campaignId={campaign.id} onUseTemplate={handleUseTemplate} />
           </TabsContent>
 
           <TabsContent value="scripts" className="mt-0">
