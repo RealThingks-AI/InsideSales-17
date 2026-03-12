@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCampaignCommunications, useCampaignContacts, useCampaignAccounts, useCampaignEmailTemplates } from '@/hooks/useCampaigns';
 import { useUserDisplayNames } from '@/hooks/useUserDisplayNames';
 import { useAuth } from '@/hooks/useAuth';
