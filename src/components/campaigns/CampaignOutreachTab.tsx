@@ -87,6 +87,14 @@ export function CampaignOutreachTab({ campaignId, initialTemplateId, onTemplateP
   const accounts = accountsQuery.query.data || [];
   const templates = templatesQuery.query.data || [];
 
+  // Handle template passed from Templates tab
+  useEffect(() => {
+    if (initialTemplateId && templates.length > 0) {
+      openSendDialog(initialTemplateId);
+      onTemplatePicked?.();
+    }
+  }, [initialTemplateId, templates]);
+
   const openSendDialog = (templateId?: string) => {
     if (templateId) {
       const t = templates.find(t => t.id === templateId);
