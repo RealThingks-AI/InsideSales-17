@@ -84,6 +84,10 @@ export function CampaignModal({ open, onOpenChange, campaign }: Props) {
 
   const handleSubmit = async () => {
     if (!form.campaign_name.trim()) return;
+    if (form.start_date && form.end_date && form.start_date > form.end_date) {
+      toast({ title: 'Start date cannot be after end date', variant: 'destructive' });
+      return;
+    }
     const payload = {
       ...form,
       owner: form.owner || null,

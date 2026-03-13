@@ -457,9 +457,9 @@ export function useCampaignAggregates() {
     queryKey: ['campaign_aggregates'],
     queryFn: async () => {
       const [accountsRes, contactsRes, dealsRes] = await Promise.all([
-        supabase.from('campaign_accounts').select('campaign_id'),
-        supabase.from('campaign_contacts').select('campaign_id'),
-        supabase.from('deals').select('campaign_id').not('campaign_id', 'is', null),
+        supabase.from('campaign_accounts').select('campaign_id').limit(10000),
+        supabase.from('campaign_contacts').select('campaign_id').limit(10000),
+        supabase.from('deals').select('campaign_id').not('campaign_id', 'is', null).limit(10000),
       ]);
 
       const counts: Record<string, { accounts: number; contacts: number; deals: number }> = {};
