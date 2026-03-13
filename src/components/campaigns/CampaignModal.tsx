@@ -21,6 +21,8 @@ interface Props {
 
 export function CampaignModal({ open, onOpenChange, campaign }: Props) {
   const { createCampaign, updateCampaign } = useCampaigns();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const isEdit = !!campaign;
 
   const profilesQuery = useQuery({
