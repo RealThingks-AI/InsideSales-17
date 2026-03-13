@@ -71,7 +71,7 @@ export function CampaignModal({ open, onOpenChange, campaign }: Props) {
         description: '',
         campaign_type: 'Email',
         status: 'Draft',
-        owner: '',
+        owner: user?.id || '',
         start_date: '',
         end_date: '',
         region: '',
