@@ -224,6 +224,17 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
                 <Input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} className="h-9" />
               </div>
             </div>
+            <div>
+              <Label>Assigned To</Label>
+              <Select value={form.assigned_to} onValueChange={v => set('assigned_to', v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select user (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {(profilesQuery.data || []).map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-3">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
