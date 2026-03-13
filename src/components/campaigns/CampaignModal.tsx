@@ -10,6 +10,8 @@ import { CAMPAIGN_STATUSES, CAMPAIGN_TYPES, AUDIENCE_SEGMENTS } from '@/types/ca
 import type { Campaign } from '@/types/campaign';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   open: boolean;
