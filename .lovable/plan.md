@@ -1,48 +1,61 @@
 
 
-## Campaign Module Status: Comprehensive Review
+## Campaign Module Verification Report
 
-### Already Implemented (No Changes Needed)
+### Status: Fully Implemented with 1 Bug Found
 
-| Feature | Status |
-|---------|--------|
-| Sidebar placement (Dashboard > Accounts > Contacts > Deals > Campaigns > Action Items) | Done |
-| Campaign CRUD (create, edit, delete) with all fields (name, type, status, owner, dates, region, country, target audience, message strategy) | Done |
-| Campaign list with columns: Name, Owner, Type, Status, Start/End Date, Accounts, Contacts, Deals, Won | Done |
-| Account integration: search, filter (industry, country), bulk add, status tracking (Not Contacted through Deal Created) | Done |
-| Contact integration: search, filter (account, position), bulk add, stage tracking (Not Contacted through Qualified), LinkedIn/Phone display | Done |
-| Email Templates: CRUD with template name, subject, body, email type, audience segment | Done |
-| Phone Scripts: CRUD with opening script, key talking points, discovery questions, objection handling, audience segment | Done |
-| Marketing Materials: upload/delete with file type classification, stored in `campaign-materials` bucket | Done |
-| Communication tracking: log Email/Phone/LinkedIn/Meeting/Follow Up with all status fields (email status, call outcome, LinkedIn status) | Done |
-| Send emails directly from campaign via `send-campaign-email` edge function (Microsoft Graph API) | Done |
-| "Use Template" action on email templates to pre-fill send dialog | Done |
-| Convert to Deal: creates Deal at Lead stage, links contact as Champion stakeholder, updates campaign contact/account statuses, links campaign_id | Done |
-| Action Items integration: create tasks linked to campaigns via `module_type='campaigns'`, visible in both campaign detail and Action Items module | Done |
-| Campaign Analytics: accounts targeted, contacts targeted, emails sent, calls made, LinkedIn messages, meetings, responses, deals created, deals won, outreach funnel chart, communication breakdown pie chart | Done |
-| Campaign Settings in Settings page: view types/statuses/segments, follow-up rules persisted to `campaign_settings` DB table | Done |
-| Owner filter on campaigns list page | Done |
+Every requirement from the integration plan is implemented and working:
 
-### No Gaps Found
+| Component | Status |
+|-----------|--------|
+| Sidebar: Dashboard > Accounts > Contacts > Deals > Campaigns > Action Items | Done |
+| Campaign CRUD with MART fields (Message, Audience, Region, Timing) | Done |
+| Campaign list with all required columns + aggregates | Done |
+| Accounts tab: search, industry/country filters, bulk add, status tracking | Done |
+| Contacts tab: search, account/position filters, bulk add, stage tracking | Done |
+| Email Templates: CRUD with type + audience segment | Done |
+| Phone Scripts: CRUD with all playbook fields | Done |
+| Marketing Materials: upload/delete with type classification | Done |
+| Communication tracking: all 5 types with status fields | Done |
+| Send email via Edge Function (Microsoft Graph API) | Done (bug below) |
+| "Use Template" to pre-fill send dialog | Done |
+| Convert to Deal at Lead stage with stakeholder linking | Done |
+| Action Items linked via `module_type='campaigns'` | Done |
+| Analytics: 9 metrics, funnel chart, pie chart, summary | Done |
+| Campaign Settings: persisted to DB with follow-up rules | Done |
+| Owner filter on campaigns list | Done |
 
-Every requirement from the integration plan document is already implemented:
+### Bug: Edge Function Auth Method
 
-1. **MART Strategy (Message, Audience, Region, Timing)**: Campaign creation form captures all four -- message strategy, target audience, region/country, start/end dates
-2. **Email sending with tracking**: Edge function sends via Graph API, logs to `email_history` and `campaign_communications`, updates contact stage
-3. **Audience segmentation**: Position/title filter on contacts, audience segment field on templates and scripts
-4. **Regional targeting**: Country and region fields on campaigns, country filter on accounts
-5. **Campaign timing**: Start/end date fields, follow-up schedule settings
-6. **Deal conversion at Lead stage**: ConvertToDealDialog creates deal with `stage: 'Lead'`, links campaign_id
-7. **All communication types tracked**: Email, Phone, LinkedIn, Meeting, Follow Up with type-specific status fields
-8. **Full analytics dashboard**: All 9 metrics, funnel chart, pie chart, summary stats
+**File:** `supabase/functions/send-campaign-email/index.ts` (line 54)
 
-### Conclusion
+The function uses `supabase.auth.getClaims(token)` which is **not a valid Supabase JS v2 method**. This will cause email sending to fail with an error.
 
-The Campaign module is fully built and matches the integration plan specification. There are no missing features to implement. The module already functions as the "sales outreach orchestration layer" described in the plan, connecting Accounts, Contacts, Deals, and Tasks with full MART strategy support.
+**Fix:** Replace `getClaims` with `supabase.auth.getUser(token)`:
 
-If you want to enhance the module further, consider these potential improvements:
-- Bulk email sending to multiple contacts at once
-- Email scheduling (send at a future time)
-- Campaign cloning/duplication
-- Campaign activity timeline view
+```typescript
+// Current (broken):
+const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+if (claimsError || !claimsData?.claims) { ... }
+const userId = claimsData.claims.sub;
+
+// Fixed:
+const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+if (userError || !user) { ... }
+const userId = user.id;
+```
+
+This is a single-line fix in the edge function. No other changes needed.
+
+### Integration Verification
+
+- **Accounts integration:** Campaign accounts link to CRM accounts table, filters use real account data
+- **Contacts integration:** Campaign contacts link to CRM contacts, show email/phone/LinkedIn, position filtering works
+- **Deals integration:** Convert-to-Deal creates deal at Lead stage, links campaign_id, adds Champion stakeholder, updates statuses
+- **Action Items integration:** Tasks use `module_type='campaigns'` and `module_id=campaignId`, visible in both campaign detail and Action Items module
+- **Settings integration:** Campaign Settings section shows all types/statuses/segments and persists follow-up rules to `campaign_settings` DB table
+
+### No Missing Features
+
+The module is complete. No additional implementation is needed beyond fixing the edge function auth bug.
 
