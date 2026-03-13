@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, CheckCircle2, Circle, Clock, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useUserDisplayNames } from '@/hooks/useUserDisplayNames';
-import { format } from 'date-fns';
 
 interface Props {
   campaignId: string;
