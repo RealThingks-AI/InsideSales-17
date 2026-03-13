@@ -93,7 +93,7 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['actionItems'] });
       toast({ title: 'Action item created' });
       setCreateOpen(false);
-      setForm({ title: '', description: '', priority: 'Medium', status: 'Open', due_date: '' });
+      setForm({ title: '', description: '', priority: 'Medium', status: 'Open', due_date: '', assigned_to: '' });
     },
     onError: (err: any) => {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
