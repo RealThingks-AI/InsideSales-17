@@ -81,6 +81,7 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
         priority: form.priority,
         status: form.status,
         due_date: form.due_date || null,
+        assigned_to: form.assigned_to || null,
         module_type: 'campaigns',
         module_id: campaignId,
         created_by: user!.id,
