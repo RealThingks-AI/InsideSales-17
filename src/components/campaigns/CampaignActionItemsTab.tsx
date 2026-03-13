@@ -46,6 +46,16 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
     priority: 'Medium',
     status: 'Open',
     due_date: '',
+    assigned_to: '',
+  });
+
+  const profilesQuery = useQuery({
+    queryKey: ['profiles_for_action_items'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name');
+      return data || [];
+    },
+    enabled: !!user,
   });
 
   const query = useQuery({
