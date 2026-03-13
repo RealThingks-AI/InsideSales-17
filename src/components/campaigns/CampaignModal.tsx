@@ -10,6 +10,8 @@ import { CAMPAIGN_STATUSES, CAMPAIGN_TYPES, AUDIENCE_SEGMENTS } from '@/types/ca
 import type { Campaign } from '@/types/campaign';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   open: boolean;
@@ -19,6 +21,8 @@ interface Props {
 
 export function CampaignModal({ open, onOpenChange, campaign }: Props) {
   const { createCampaign, updateCampaign } = useCampaigns();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const isEdit = !!campaign;
 
   const profilesQuery = useQuery({
@@ -67,7 +71,7 @@ export function CampaignModal({ open, onOpenChange, campaign }: Props) {
         description: '',
         campaign_type: 'Email',
         status: 'Draft',
-        owner: '',
+        owner: user?.id || '',
         start_date: '',
         end_date: '',
         region: '',
@@ -80,6 +84,10 @@ export function CampaignModal({ open, onOpenChange, campaign }: Props) {
 
   const handleSubmit = async () => {
     if (!form.campaign_name.trim()) return;
+    if (form.start_date && form.end_date && form.start_date > form.end_date) {
+      toast({ title: 'Start date cannot be after end date', variant: 'destructive' });
+      return;
+    }
     const payload = {
       ...form,
       owner: form.owner || null,

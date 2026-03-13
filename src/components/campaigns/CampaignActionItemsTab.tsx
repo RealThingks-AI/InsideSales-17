@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Plus, CheckCircle2, Circle, Clock, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useUserDisplayNames } from '@/hooks/useUserDisplayNames';
 
 interface Props {
   campaignId: string;
@@ -44,6 +45,16 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
     priority: 'Medium',
     status: 'Open',
     due_date: '',
+    assigned_to: '',
+  });
+
+  const profilesQuery = useQuery({
+    queryKey: ['profiles_for_action_items'],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name');
+      return data || [];
+    },
+    enabled: !!user,
   });
 
   const query = useQuery({
@@ -70,6 +81,7 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
         priority: form.priority,
         status: form.status,
         due_date: form.due_date || null,
+        assigned_to: form.assigned_to || null,
         module_type: 'campaigns',
         module_id: campaignId,
         created_by: user!.id,
@@ -81,7 +93,7 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['actionItems'] });
       toast({ title: 'Action item created' });
       setCreateOpen(false);
-      setForm({ title: '', description: '', priority: 'Medium', status: 'Open', due_date: '' });
+      setForm({ title: '', description: '', priority: 'Medium', status: 'Open', due_date: '', assigned_to: '' });
     },
     onError: (err: any) => {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
@@ -211,6 +223,17 @@ export function CampaignActionItemsTab({ campaignId }: Props) {
                 <Label>Due Date</Label>
                 <Input type="date" value={form.due_date} onChange={e => set('due_date', e.target.value)} className="h-9" />
               </div>
+            </div>
+            <div>
+              <Label>Assigned To</Label>
+              <Select value={form.assigned_to} onValueChange={v => set('assigned_to', v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select user (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {(profilesQuery.data || []).map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || 'Unnamed'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-3">

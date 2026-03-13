@@ -155,7 +155,8 @@ export function CampaignOutreachTab({ campaignId, initialTemplateId, onTemplateP
 
       toast({ title: 'Email sent successfully' });
       setSendOpen(false);
-      // Refresh communications list
+      // Refresh communications list and contacts
+      query.refetch();
       contactsQuery.query.refetch();
     } catch (err: any) {
       toast({ title: 'Error sending email', description: err.message, variant: 'destructive' });
