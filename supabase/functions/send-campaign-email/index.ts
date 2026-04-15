@@ -17,6 +17,7 @@ interface EmailRequest {
   recipient_name: string;
   parent_id?: string;
   thread_id?: string;
+  parent_internet_message_id?: string;
 }
 
 /**
@@ -25,11 +26,9 @@ interface EmailRequest {
  * Otherwise, convert newlines to <br> tags.
  */
 function ensureHtmlBody(body: string): string {
-  // Check if body already contains HTML tags
   if (/<[a-z][\s\S]*>/i.test(body)) {
     return body;
   }
-  // Convert plain text newlines to <br> tags
   return body.replace(/\n/g, '<br>');
 }
 
@@ -81,12 +80,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Send via the shared mailbox, but set "from" to the logged-in user's email
     const mailboxEmail = azureConfig.senderEmail;
     const fromEmail = user.email || mailboxEmail;
     console.log(`Sending email via mailbox: ${mailboxEmail}, from: ${fromEmail} (user: ${user.email})`);
 
-    // Get access token
     let accessToken: string;
     try {
       accessToken = await getGraphAccessToken(azureConfig);
@@ -94,7 +91,6 @@ Deno.serve(async (req) => {
       const errMsg = (err as Error).message;
       console.error("Failed to get Azure access token:", errMsg);
 
-      // Log failed communication
       await supabaseClient.from("campaign_communications").insert({
         campaign_id: payload.campaign_id,
         contact_id: payload.contact_id,
@@ -137,10 +133,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Convert plain text newlines to HTML <br> tags
+    // If this is a reply, look up the parent's internet_message_id for threading
+    let replyToInternetMessageId: string | undefined;
+    if (payload.parent_id) {
+      // Use explicitly passed parent_internet_message_id first
+      if (payload.parent_internet_message_id) {
+        replyToInternetMessageId = payload.parent_internet_message_id;
+      } else {
+        // Look up from DB
+        const { data: parentComm } = await supabaseClient
+          .from("campaign_communications")
+          .select("internet_message_id")
+          .eq("id", payload.parent_id)
+          .single();
+        if (parentComm?.internet_message_id) {
+          replyToInternetMessageId = parentComm.internet_message_id;
+        }
+      }
+    }
+
     const htmlBody = ensureHtmlBody(payload.body);
 
-    // Send email via shared mailbox with from set to user's email
     const result = await sendEmailViaGraph(
       accessToken,
       mailboxEmail,
@@ -149,16 +162,15 @@ Deno.serve(async (req) => {
       payload.subject,
       htmlBody,
       fromEmail,
+      replyToInternetMessageId,
     );
 
     const deliveryStatus = result.success ? "sent" : "failed";
-
-    // Use Graph's real IDs instead of random UUIDs
     const messageId = result.internetMessageId || crypto.randomUUID();
     const threadId = payload.thread_id || null;
     const parentId = payload.parent_id || null;
+    const actualSender = result.sentAsUser ? fromEmail : mailboxEmail;
 
-    // Log to campaign_communications with Graph metadata
     const { data: commRecord, error: commError } = await supabaseClient
       .from("campaign_communications")
       .insert({
@@ -190,13 +202,12 @@ Deno.serve(async (req) => {
       console.error("Communication log error:", commError);
     }
 
-    // Log to email_history with internet_message_id for cross-referencing
     await supabaseClient.from("email_history").insert({
       subject: payload.subject,
       body: payload.body,
       recipient_email: payload.recipient_email,
       recipient_name: payload.recipient_name,
-      sender_email: fromEmail,
+      sender_email: actualSender,
       sent_by: user.id,
       contact_id: payload.contact_id,
       account_id: payload.account_id || null,
@@ -212,6 +223,7 @@ Deno.serve(async (req) => {
         communication_id: commRecord?.id,
         message_id: messageId,
         conversation_id: result.conversationId || null,
+        sent_as: actualSender,
         error: result.error || undefined,
         errorCode: result.errorCode || undefined,
       }),
