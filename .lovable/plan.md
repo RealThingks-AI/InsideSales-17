@@ -1,65 +1,85 @@
 
+Root cause analysis:
 
-## Three Issues — Root Causes & Fix Plan
+1. Logged-in user email is not actually being used as the sender
+- In `supabase/functions/send-campaign-email/index.ts`, the function still computes `fromEmail = user.email || mailboxEmail`.
+- But in `supabase/functions/_shared/azure-email.ts`, the code that applies `message.from` is explicitly commented out.
+- So Microsoft Graph always sends from `AZURE_SENDER_EMAIL` (`crm@realthingks.com`), regardless of the logged-in user.
+- This is consistent with the earlier `ErrorSendAsDenied` failure: the current code intentionally fell back to the shared mailbox to avoid that error.
 
-### Issue 1: Email sends from `crm@realthingks.com` instead of logged-in user's email
+2. Reply detection is pointed at the wrong mailbox
+- Outbound mail is currently sent from the shared mailbox.
+- But `supabase/functions/check-email-replies/index.ts` tries to inspect the inbox of the owner/profile email first:
+  - it maps `owner`/`created_by` to `profiles."Email ID"`
+  - then queries `/users/{senderEmail}/mailFolders/inbox/messages`
+- If the message was actually sent from `crm@realthingks.com`, replies will land in the shared mailbox thread, not necessarily the owner mailbox.
+- That means reply polling can miss replies even when `conversation_id` exists.
 
-**Root Cause:** Line 71 in `send-campaign-email/index.ts` hardcodes `actualSenderEmail = azureConfig.senderEmail` (which is `crm@realthingks.com`). The previous fix forced this because the Azure app only has `Mail.Send` permission for the shared mailbox, not individual user mailboxes.
+3. Thread metadata is also fragile for manual replies
+- The app’s internal reply flow (`CampaignCommunications.tsx` → `EmailComposeModal.tsx`) passes `parent_id`/`thread_id`, but the Graph send path does not add mail headers like `In-Reply-To` or `References`.
+- So CRM-side threading may look grouped, while Outlook/Graph-level threading can still be inconsistent.
+- Current sent-item metadata lookup only filters by subject, which is weak when multiple emails share similar subjects.
 
-**Fix:** Switch to a two-step approach (create draft + send) but on the **shared mailbox**, then set the `from` address to the logged-in user's email. This uses `Mail.ReadWrite` + `Mail.Send` on the shared mailbox only. The email appears as sent "on behalf of" the user.
+4. Your screenshot confirms the current state
+- Outlook shows the sender as `CRM`, not the logged-in user.
+- That matches the code path where `message.from` is not being set.
+- The visible “You replied…” grouping in Outlook is mailbox-native threading, but the CRM reply sync still depends on polling the correct mailbox plus storing the right conversation/message IDs.
 
-Alternatively, if the Azure app has `Mail.Send` delegated permission for user mailboxes, we can send directly as the user. But given the 403 error in logs when trying `deepak.dongare@realthingks.com`, the app lacks that permission.
+What needs to be built:
 
-**Practical fix:** Use the shared mailbox but set `from` field to the logged-in user's email in the Graph API payload. This requires the shared mailbox to grant "Send As" or "Send on Behalf" rights to users in Exchange Admin. The `sendMail` API supports a `from` field:
+Phase 1 — Fix sender behavior correctly
+- Restore optional `message.from` support in `_shared/azure-email.ts`.
+- Keep the shared mailbox as the actual send endpoint (`/users/{sharedMailbox}/sendMail`), but set:
+  - `from` to the logged-in user email
+  - and, if needed, `sender` to the shared mailbox for clearer semantics
+- Add graceful fallback behavior:
+  - if Graph returns `ErrorSendAsDenied` / `ErrorSendOnBehalfOfDenied`, store a precise failure reason instead of silently sending from CRM
+- Important: this only works after Exchange permissions are granted for the mailbox.
+- Required external setup:
+  - grant the relevant users or app-backed mailbox flow “Send As” or “Send on Behalf” rights for `crm@realthingks.com`
+- Without that Exchange change, the app cannot legally send as the logged-in user.
 
-```json
-{
-  "message": {
-    "from": { "emailAddress": { "address": "deepak.dongare@realthingks.com" } },
-    "subject": "...",
-    "toRecipients": [...]
-  }
-}
-```
+Phase 2 — Fix reply detection to use the actual sending mailbox
+- Update `check-email-replies/index.ts` so it checks the shared mailbox conversation first, because that is where replies currently arrive.
+- Do not rely on `profiles."Email ID"` as the primary inbox source while outbound mail is still shared-mailbox based.
+- Use stored send metadata to determine mailbox strategy:
+  - if email was sent from shared mailbox, poll shared mailbox
+  - only poll user mailbox if/when true per-user sending is enabled
+- Keep deduping by `internet_message_id`.
 
-**Changes:**
-- `_shared/azure-email.ts`: Add `senderDisplayEmail` parameter to `sendEmailViaGraph` and include `from` field in the Graph payload
-- `send-campaign-email/index.ts`: Pass user's email as the `from` address, keep sending via shared mailbox
+Phase 3 — Make Outlook/Graph threading robust
+- Enhance send flow to preserve proper thread linkage on replies:
+  - store and reuse original `internet_message_id`
+  - add `In-Reply-To` / `References` internet headers when replying
+  - or switch reply sends to Graph’s native reply endpoint when replying to an existing external message
+- Improve sent-item lookup after send:
+  - filter by subject plus recipient and close send timestamp window, not just subject
+- Store enough metadata to reliably reconnect future replies.
 
-### Issue 2: Email replies not tracked — `conversation_id` is always null
+Phase 4 — Align CRM thread tracking with mailbox reality
+- Keep `campaign_communications.conversation_id` as the primary email thread key.
+- For manual CRM replies, also persist the original outbound/inbound message linkage so the UI thread and Graph thread stay aligned.
+- Ensure reply-synced messages update original communication status and contact/account stage exactly once.
 
-**Root Cause:** The `sendMail` endpoint returns `202 No Content` — no response body. So `sendEmailViaGraph` returns `conversationId: null`, `internetMessageId: null`, `graphMessageId: null`. The `check-email-replies` function filters on `NOT conversation_id IS NULL`, so it finds zero trackable emails.
+Files to update:
+- `supabase/functions/_shared/azure-email.ts`
+- `supabase/functions/send-campaign-email/index.ts`
+- `supabase/functions/check-email-replies/index.ts`
 
-**Fix:** After sending via `sendMail`, query the Sent Items folder to retrieve the message metadata (conversationId, internetMessageId). Add a short delay then fetch the most recent sent message matching the subject/recipient:
+Validation after implementation:
+1. Send a new campaign email as a logged-in user.
+2. Confirm Outlook shows the sender as that user (or “on behalf of” that user, depending on Exchange config).
+3. Reply from the recipient mailbox.
+4. Run or wait for reply sync.
+5. Verify:
+   - `conversation_id` is populated
+   - reply row is inserted into `campaign_communications`
+   - original email becomes `Replied`
+   - CRM thread UI groups both messages correctly
 
-```
-GET /users/{mailbox}/mailFolders/sentitems/messages?$top=1&$orderby=sentDateTime desc&$filter=subject eq '{subject}'
-```
-
-**Changes:**
-- `_shared/azure-email.ts`: After successful `sendMail`, query Sent Items to get `conversationId`, `internetMessageId`, `graphMessageId`
-- `check-email-replies/index.ts`: No changes needed — it already works correctly once conversation_id is populated
-
-### Issue 3: Preview in app differs from actual sent email
-
-**Root Cause:** Looking at the screenshots — the preview shows the raw text with proper line breaks (`Email Template body 4` on one line, `Regards, Deepak Dongare` on another). But the sent email shows them concatenated: `Email Template body 4 Regards, Deepak Dongare`. This happens because:
-- The body is sent as `contentType: "HTML"` in Graph API
-- But the body content is plain text with `\n` newlines, not HTML `<br>` tags
-- The preview uses `whitespace-pre-wrap` CSS which renders `\n` correctly
-- But email clients render HTML where `\n` is just whitespace
-
-**Fix:** Convert plain text body to HTML before sending — replace `\n` with `<br>` tags. If the body already contains HTML tags, leave it as-is.
-
-**Changes:**
-- `send-campaign-email/index.ts`: Before sending, convert plain text newlines to `<br>` tags in the body
-
----
-
-### Files Modified
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/_shared/azure-email.ts` | Add `from` address support; add post-send Sent Items query for metadata |
-| `supabase/functions/send-campaign-email/index.ts` | Pass user email as `from`; convert `\n` to `<br>` in body |
-| Redeploy both `send-campaign-email` and `check-email-replies` edge functions |
-
+Technical note:
+- This is not just a code bug; part of it is an Exchange permission issue.
+- If Exchange delegation is not configured, the correct product behavior is:
+  - either fail clearly with a permission error
+  - or intentionally send from `crm@realthingks.com`
+- It cannot truthfully send from the logged-in user without mailbox delegation.
