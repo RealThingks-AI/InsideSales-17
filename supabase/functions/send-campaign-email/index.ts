@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use logged-in user's email as sender (fall back to shared mailbox)
-    const actualSenderEmail = user.email || azureConfig.senderEmail;
+    // Always use the configured shared mailbox as the sender
+    const actualSenderEmail = azureConfig.senderEmail;
     console.log(`Sending email as: ${actualSenderEmail} (user: ${user.email}, fallback: ${azureConfig.senderEmail})`);
 
     // Get access token
