@@ -51,9 +51,10 @@ export async function getGraphAccessToken(config: AzureEmailConfig): Promise<str
 }
 
 /**
- * Send email via Graph sendMail API.
- * Uses the simpler sendMail endpoint which only requires Mail.Send permission.
- * Falls back gracefully — does not require Mail.ReadWrite.
+ * Send email via Graph sendMail API on the shared mailbox,
+ * optionally setting the `from` address to the logged-in user's email.
+ * After sending, queries Sent Items to retrieve conversationId/internetMessageId
+ * for reply tracking.
  */
 export async function sendEmailViaGraph(
   accessToken: string,
@@ -62,16 +63,22 @@ export async function sendEmailViaGraph(
   recipientName: string,
   subject: string,
   htmlBody: string,
+  fromEmail?: string,
 ): Promise<SendEmailResult> {
   const sendUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
-  const messagePayload = {
-    message: {
-      subject,
-      body: { contentType: "HTML", content: htmlBody },
-      toRecipients: [{ emailAddress: { address: recipientEmail, name: recipientName } }],
-    },
-    saveToSentItems: true,
+
+  // Build message payload
+  const message: Record<string, unknown> = {
+    subject,
+    body: { contentType: "HTML", content: htmlBody },
+    toRecipients: [{ emailAddress: { address: recipientEmail, name: recipientName } }],
   };
+
+  // If fromEmail is provided and different from the mailbox, set the from field
+  // This requires "Send As" or "Send on Behalf" permission in Exchange Admin
+  if (fromEmail && fromEmail.toLowerCase() !== senderEmail.toLowerCase()) {
+    message.from = { emailAddress: { address: fromEmail } };
+  }
 
   const sendResp = await fetch(sendUrl, {
     method: "POST",
@@ -79,7 +86,7 @@ export async function sendEmailViaGraph(
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(messagePayload),
+    body: JSON.stringify({ message, saveToSentItems: true }),
   });
 
   if (!sendResp.ok) {
@@ -93,13 +100,50 @@ export async function sendEmailViaGraph(
     return { success: false, error: errBody, errorCode };
   }
 
-  // sendMail returns 202 with empty body
+  // sendMail returns 202 with empty body — consume it
   await sendResp.text();
+
+  // Query Sent Items to retrieve message metadata for reply tracking
+  // Small delay to allow Graph to index the sent message
+  await new Promise((r) => setTimeout(r, 2000));
+
+  let graphMessageId: string | null = null;
+  let internetMessageId: string | null = null;
+  let conversationId: string | null = null;
+
+  try {
+    // Escape single quotes in subject for OData filter
+    const escapedSubject = subject.replace(/'/g, "''");
+    const filter = encodeURIComponent(`subject eq '${escapedSubject}'`);
+    const sentItemsUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/mailFolders/sentitems/messages?$top=1&$orderby=sentDateTime desc&$filter=${filter}&$select=id,internetMessageId,conversationId`;
+
+    const sentResp = await fetch(sentItemsUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (sentResp.ok) {
+      const sentData = await sentResp.json();
+      const msgs = sentData.value || [];
+      if (msgs.length > 0) {
+        graphMessageId = msgs[0].id || null;
+        internetMessageId = msgs[0].internetMessageId || null;
+        conversationId = msgs[0].conversationId || null;
+        console.log(`Retrieved sent message metadata: graphId=${graphMessageId}, internetMsgId=${internetMessageId}, convId=${conversationId}`);
+      } else {
+        console.warn("No sent message found in Sent Items after sendMail");
+      }
+    } else {
+      const errText = await sentResp.text();
+      console.warn(`Failed to query Sent Items: ${sentResp.status} ${errText}`);
+    }
+  } catch (metaErr) {
+    console.warn("Error retrieving sent message metadata:", metaErr);
+  }
 
   return {
     success: true,
-    graphMessageId: null,
-    internetMessageId: null,
-    conversationId: null,
+    graphMessageId,
+    internetMessageId,
+    conversationId,
   };
 }

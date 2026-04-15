@@ -19,6 +19,20 @@ interface EmailRequest {
   thread_id?: string;
 }
 
+/**
+ * Convert plain text body to HTML-safe body.
+ * If the body already contains HTML tags, leave it as-is.
+ * Otherwise, convert newlines to <br> tags.
+ */
+function ensureHtmlBody(body: string): string {
+  // Check if body already contains HTML tags
+  if (/<[a-z][\s\S]*>/i.test(body)) {
+    return body;
+  }
+  // Convert plain text newlines to <br> tags
+  return body.replace(/\n/g, '<br>');
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -67,9 +81,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Always use the configured shared mailbox as the sender
-    const actualSenderEmail = azureConfig.senderEmail;
-    console.log(`Sending email as: ${actualSenderEmail} (user: ${user.email}, fallback: ${azureConfig.senderEmail})`);
+    // Send via the shared mailbox, but set "from" to the logged-in user's email
+    const mailboxEmail = azureConfig.senderEmail;
+    const fromEmail = user.email || mailboxEmail;
+    console.log(`Sending email via mailbox: ${mailboxEmail}, from: ${fromEmail} (user: ${user.email})`);
 
     // Get access token
     let accessToken: string;
@@ -104,7 +119,7 @@ Deno.serve(async (req) => {
         body: payload.body,
         recipient_email: payload.recipient_email,
         recipient_name: payload.recipient_name,
-        sender_email: actualSenderEmail,
+        sender_email: fromEmail,
         sent_by: user.id,
         contact_id: payload.contact_id,
         account_id: payload.account_id || null,
@@ -122,14 +137,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Send email (two-step: draft + send, captures Graph metadata)
+    // Convert plain text newlines to HTML <br> tags
+    const htmlBody = ensureHtmlBody(payload.body);
+
+    // Send email via shared mailbox with from set to user's email
     const result = await sendEmailViaGraph(
       accessToken,
-      actualSenderEmail,
+      mailboxEmail,
       payload.recipient_email,
       payload.recipient_name,
       payload.subject,
-      payload.body,
+      htmlBody,
+      fromEmail,
     );
 
     const deliveryStatus = result.success ? "sent" : "failed";
@@ -177,7 +196,7 @@ Deno.serve(async (req) => {
       body: payload.body,
       recipient_email: payload.recipient_email,
       recipient_name: payload.recipient_name,
-      sender_email: actualSenderEmail,
+      sender_email: fromEmail,
       sent_by: user.id,
       contact_id: payload.contact_id,
       account_id: payload.account_id || null,
