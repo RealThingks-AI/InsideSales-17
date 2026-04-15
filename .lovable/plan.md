@@ -1,91 +1,107 @@
 
 
-## Fix Note Editor Bullet Point & Stakeholders Layout Issues
+## Email Reply Tracking -- Automatic Sync Plan
 
-### Issues Found
+### Problem Summary
 
-1. **Bullet point moves when typing**: `autoFocus` on the Textarea (line 633) places the cursor at position 0 (before `"• "`), so typing inserts text before the bullet instead of after it.
+After deep analysis of the entire email sending and tracking flow, here are all the issues found:
 
-2. **Notes panel lacks proper scrollbar**: The notes summary panel (line 580-679) has a `max-h-[280px]` on the inner div but the outer wrapper has no scroll constraint, so it still pushes content.
+1. **No reply detection mechanism exists** -- The system sends emails via Microsoft Graph `sendMail` API but has zero infrastructure to detect incoming replies. No Graph webhooks, no polling, no delta queries.
 
-3. **Stakeholders section grows unbounded**: The `StakeholdersSection` component has no max-height. When the Notes panel is open with many notes, it consumes all vertical space, squishing the Updates and Action Items sections to near-zero height.
+2. **Graph `sendMail` returns no message metadata** -- The `sendMail` endpoint returns `202 Accepted` with an empty body. The code generates a random UUID as `message_id` (line 139 of `send-campaign-email/index.ts`) instead of capturing Graph's actual `internetMessageId` or `conversationId`. This makes thread correlation impossible.
 
-### Changes (single file: `src/components/DealExpandedPanel.tsx`)
+3. **Thread view groups by contact, not email thread** -- `CampaignCommunications.tsx` line 138-157 groups all communications (emails, calls, LinkedIn) by `contact_id` rather than by actual email `thread_id`. This makes the "Threads" view misleading.
 
-#### Fix 1: Bullet cursor positioning (line 628-634)
+4. **"Log Reply" only manually logs -- no status propagation** -- When clicking "Log Reply", it opens the log modal pre-filled with `email_status: "Replied"` but does NOT update the original sent email's status or the `email_history` record's `reply_count`/`replied_at` fields.
 
-Replace `autoFocus` on the Textarea with a `ref` callback that focuses the element AND places the cursor at the end of the text (after `"• "`):
+5. **`email_history` reply fields never updated** -- The `email_history` table has `reply_count`, `replied_at`, `last_reply_at` columns but nothing ever writes to them.
 
-```tsx
-<Textarea
-  value={noteText}
-  onChange={(e) => setNoteText(e.target.value)}
-  onKeyDown={handleNoteKeyDown}
-  className="min-h-[100px] text-xs resize-none"
-  ref={(el) => {
-    if (el) {
-      el.focus();
-      const len = el.value.length;
-      el.selectionStart = len;
-      el.selectionEnd = len;
-    }
-  }}
-/>
-```
+6. **Emails sent from Contacts tab don't go through Graph** -- `CampaignContacts.tsx` and `CampaignAccountsContacts.tsx` have their own `handleSendEmail` that inserts directly into `campaign_communications` without calling the `send-campaign-email` edge function (no actual email delivery, no `delivery_status`, no `sent_via`).
 
-#### Fix 2: Constrain Stakeholders section height
+### Architecture for Automatic Reply Sync
 
-Wrap the StakeholdersSection output in a container with `max-h` and `overflow-y-auto` so it scrolls when content is large. Change the outer div (line 462) from:
+Since the user wants **automatic sync**, we need to poll the sender's mailbox via Microsoft Graph to detect replies to campaign emails. The approach:
 
-```tsx
-<div className="px-3 pt-1.5 pb-1">
-```
+**Two-step send** (instead of `sendMail`): Create a draft message, then send it. The draft creation returns the `internetMessageId` and `conversationId` which we store for thread correlation.
 
-to:
+**Reply polling edge function**: A new scheduled edge function that periodically queries Graph for new messages that are replies to known campaign emails, using the stored `conversationId`.
 
-```tsx
-<div className="px-3 pt-1.5 pb-1 max-h-[45%] overflow-y-auto shrink-0">
-```
+### Implementation Plan
 
-However, since this is not inside a flex parent that uses percentage heights well, a better approach is to change the parent layout. The parent (line 1182) is:
+#### Phase 1: Capture Graph Message Metadata on Send
 
-```tsx
-<div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-1">
-```
+**File: `supabase/functions/_shared/azure-email.ts`**
+- Replace `sendMail` with a two-step approach:
+  1. `POST /users/{sender}/messages` -- creates a draft, returns the message object with `internetMessageId` and `conversationId`
+  2. `POST /users/{sender}/messages/{id}/send` -- sends the draft
+- Update `SendEmailResult` to include `graphMessageId`, `internetMessageId`, and `conversationId`
 
-The fix: Make the StakeholdersSection a flex item that can shrink, and give it a max-height so it doesn't dominate. Change line 1184 from:
+**File: `supabase/functions/send-campaign-email/index.ts`**
+- Store `graphMessageId`, `internetMessageId`, and `conversationId` from the send result
+- Save these in `campaign_communications.message_id` (use `internetMessageId` instead of random UUID)
+- Store `conversationId` in `campaign_communications.thread_id` (currently stores a random UUID or null)
 
-```tsx
-<StakeholdersSection deal={deal} queryClient={queryClient} />
-```
+**Migration**: Add columns to `campaign_communications`:
+- `graph_message_id TEXT` -- Graph internal message ID
+- `internet_message_id TEXT` -- RFC 2822 Message-ID
+- `conversation_id TEXT` -- Graph conversation ID for thread grouping
 
-to wrap it in a constrained container:
+Add column to `email_history`:
+- `internet_message_id TEXT` -- for cross-referencing
 
-```tsx
-<div className="shrink-0 max-h-[40%] overflow-y-auto">
-  <StakeholdersSection deal={deal} queryClient={queryClient} />
-</div>
-```
+#### Phase 2: Reply Detection Edge Function
 
-This ensures:
-- Stakeholders section gets at most 40% of the panel height
-- When content exceeds that, a scrollbar appears
-- Updates and Action Items always get their fair share of space
+**New file: `supabase/functions/check-email-replies/index.ts`**
+- Scheduled via pg_cron (every 5 minutes)
+- Queries `campaign_communications` for emails sent via Graph in the last 7 days that have a `conversation_id`
+- For each unique sender email + conversation_id pair, queries Graph: `GET /users/{senderEmail}/mailFolders/inbox/messages?$filter=conversationId eq '{convId}'&$orderby=receivedDateTime desc`
+- For each reply found that isn't already tracked:
+  - Insert a new `campaign_communications` record with `communication_type: "Email"`, `email_status: "Replied"`, `parent_id` pointing to the original, `thread_id` matching the original, `sent_via: "graph-sync"`
+  - Update the original email's `email_status` to "Replied"
+  - Update corresponding `email_history` record: increment `reply_count`, set `replied_at`/`last_reply_at`
+  - Update `campaign_contacts` stage to "Responded" if rank is higher
+  - Recompute `campaign_accounts` status
 
-#### Fix 3: Ensure notes panel scrolls properly
+#### Phase 3: Fix Thread View to Use Real Threads
 
-The notes summary panel (line 596) already has `max-h-[280px] overflow-y-auto`, but when inside the constrained container from Fix 2, this works correctly. No additional change needed here -- the outer scroll from Fix 2 handles it.
+**File: `src/components/campaigns/CampaignCommunications.tsx`**
+- Update the `threads` memo (line 138) to group emails by `conversation_id` or `thread_id` (for actual email threading) rather than `contact_id`
+- Keep the contact-grouped view as a separate "Contact Activity" view
+- Show reply chains properly with indentation in the thread view
 
-### Summary
+#### Phase 4: Fix Log Reply to Update Original Email
 
-| Change | Line(s) | Description |
-|--------|---------|-------------|
-| Replace `autoFocus` with ref callback | 628-634 | Cursor placed after bullet on open |
-| Wrap StakeholdersSection in scrollable container | 1184 | Max 40% height with scrollbar |
+**File: `src/components/campaigns/CampaignCommunications.tsx`**
+- When logging a reply (line 416-432), after inserting the reply record:
+  - Update the parent email's `email_status` to "Replied"
+  - Update the matching `email_history` record's `reply_count` and `replied_at`
+  - Update `campaign_contacts` stage to "Responded"
+
+#### Phase 5: Fix Contacts Tab Email Sending
+
+**Files: `src/components/campaigns/CampaignContacts.tsx`, `src/components/campaigns/CampaignAccountsContacts.tsx`**
+- Replace direct `campaign_communications.insert` with a call to `supabase.functions.invoke("send-campaign-email", ...)` so emails are actually sent via Graph and properly tracked
+
+#### Phase 6: Schedule the Polling Function
+
+- Use `supabase--read_query` + SQL insert to create a pg_cron job that calls `check-email-replies` every 5 minutes
+- The function authenticates with Graph using the same Azure credentials already configured
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `supabase/functions/_shared/azure-email.ts` | Two-step send (draft + send) returning message metadata |
+| `supabase/functions/send-campaign-email/index.ts` | Store Graph metadata instead of random UUIDs |
+| New: `supabase/functions/check-email-replies/index.ts` | Polling function for reply detection |
+| `src/components/campaigns/CampaignCommunications.tsx` | Fix thread view, fix Log Reply to update parent, fix status propagation |
+| `src/components/campaigns/CampaignContacts.tsx` | Use edge function for actual email sending |
+| `src/components/campaigns/CampaignAccountsContacts.tsx` | Use edge function for actual email sending |
+| Migration | Add `graph_message_id`, `internet_message_id`, `conversation_id` columns |
 
 ### Technical Notes
 
-- The ref callback fires on every render, but since `el.focus()` is idempotent when already focused, this is harmless
-- The `max-h-[40%]` works because the parent has `flex-1 min-h-0` which resolves to an actual pixel height
-- Updates and Action Items sections keep their `flex-1 min-h-0` with `h-[220px]`, ensuring they share remaining space equally
+- The Azure app registration already has `Mail.Send` application permission (confirmed by successful sends). It will also need `Mail.Read` or `Mail.ReadBasic` application permission for reading inbox replies. The user may need to grant this in Azure Portal.
+- The pg_cron job will be created via SQL insert (not migration) since it contains project-specific URLs.
+- The two-step send (draft + send) is slightly slower than `sendMail` but is the only way to get the `internetMessageId` before send.
 
