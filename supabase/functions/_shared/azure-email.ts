@@ -14,6 +14,7 @@ export interface SendEmailResult {
   graphMessageId?: string;
   internetMessageId?: string;
   conversationId?: string;
+  sentAsUser?: boolean;
 }
 
 export function getAzureEmailConfig(): AzureEmailConfig | null {
@@ -51,10 +52,10 @@ export async function getGraphAccessToken(config: AzureEmailConfig): Promise<str
 }
 
 /**
- * Send email via Graph sendMail API on the shared mailbox,
- * optionally setting the `from` address to the logged-in user's email.
- * After sending, queries Sent Items to retrieve conversationId/internetMessageId
- * for reply tracking.
+ * Send email via Graph sendMail API on the shared mailbox.
+ * Attempts to set the `from` address to the logged-in user's email.
+ * If that fails with ErrorSendAsDenied, retries without `from` (sends as shared mailbox).
+ * After sending, queries Sent Items to retrieve conversationId/internetMessageId.
  */
 export async function sendEmailViaGraph(
   accessToken: string,
@@ -64,6 +65,7 @@ export async function sendEmailViaGraph(
   subject: string,
   htmlBody: string,
   fromEmail?: string,
+  replyToInternetMessageId?: string,
 ): Promise<SendEmailResult> {
   const sendUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
 
@@ -74,15 +76,23 @@ export async function sendEmailViaGraph(
     toRecipients: [{ emailAddress: { address: recipientEmail, name: recipientName } }],
   };
 
-  // Note: Setting a "from" address different from the mailbox requires
-  // "Send As" or "Send on Behalf" permission in Exchange Admin.
-  // Currently disabled because the Azure app lacks this permission.
-  // To enable: grant "Send As" rights on the shared mailbox, then uncomment:
-  // if (fromEmail && fromEmail.toLowerCase() !== senderEmail.toLowerCase()) {
-  //   message.from = { emailAddress: { address: fromEmail } };
-  // }
+  // Add In-Reply-To / References headers for proper threading
+  if (replyToInternetMessageId) {
+    message.internetMessageHeaders = [
+      { name: "In-Reply-To", value: replyToInternetMessageId },
+      { name: "References", value: replyToInternetMessageId },
+    ];
+  }
 
-  const sendResp = await fetch(sendUrl, {
+  // Try sending with "from" set to the user's email first
+  const wantFrom = fromEmail && fromEmail.toLowerCase() !== senderEmail.toLowerCase();
+  let sentAsUser = false;
+
+  if (wantFrom) {
+    message.from = { emailAddress: { address: fromEmail } };
+  }
+
+  let sendResp = await fetch(sendUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -90,6 +100,30 @@ export async function sendEmailViaGraph(
     },
     body: JSON.stringify({ message, saveToSentItems: true }),
   });
+
+  // If ErrorSendAsDenied, retry without the from field
+  if (!sendResp.ok && wantFrom) {
+    const errBody = await sendResp.text();
+    let errorCode = "";
+    try {
+      const parsed = JSON.parse(errBody);
+      errorCode = parsed?.error?.code || "";
+    } catch { /* ignore */ }
+
+    if (errorCode === "ErrorSendAsDenied" || errorCode === "ErrorSendOnBehalfOfDenied") {
+      console.warn(`Send-as denied for ${fromEmail}, retrying as shared mailbox ${senderEmail}`);
+      delete message.from;
+
+      sendResp = await fetch(sendUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message, saveToSentItems: true }),
+      });
+    }
+  }
 
   if (!sendResp.ok) {
     const errBody = await sendResp.text();
@@ -102,22 +136,25 @@ export async function sendEmailViaGraph(
     return { success: false, error: errBody, errorCode };
   }
 
+  // If we got here with from still set, user email was used
+  sentAsUser = wantFrom && (message.from !== undefined);
+
   // sendMail returns 202 with empty body — consume it
   await sendResp.text();
 
   // Query Sent Items to retrieve message metadata for reply tracking
-  // Small delay to allow Graph to index the sent message
-  await new Promise((r) => setTimeout(r, 2000));
+  await new Promise((r) => setTimeout(r, 2500));
 
   let graphMessageId: string | null = null;
   let internetMessageId: string | null = null;
   let conversationId: string | null = null;
 
   try {
-    // Escape single quotes in subject for OData filter
+    // Use a simple query: get the most recent sent item to this recipient with this subject
     const escapedSubject = subject.replace(/'/g, "''");
-    const filter = encodeURIComponent(`subject eq '${escapedSubject}'`);
-    const sentItemsUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/mailFolders/sentitems/messages?$top=1&$orderby=sentDateTime desc&$filter=${filter}&$select=id,internetMessageId,conversationId`;
+    const escapedRecipient = recipientEmail.replace(/'/g, "''");
+    // Build filter with subject and recipient — use $search if filter is too complex
+    const sentItemsUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/mailFolders/sentitems/messages?$top=5&$orderby=sentDateTime desc&$select=id,internetMessageId,conversationId,subject,toRecipients`;
 
     const sentResp = await fetch(sentItemsUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -126,10 +163,19 @@ export async function sendEmailViaGraph(
     if (sentResp.ok) {
       const sentData = await sentResp.json();
       const msgs = sentData.value || [];
-      if (msgs.length > 0) {
-        graphMessageId = msgs[0].id || null;
-        internetMessageId = msgs[0].internetMessageId || null;
-        conversationId = msgs[0].conversationId || null;
+      // Find the matching message by subject and recipient
+      const match = msgs.find((m: any) => {
+        const subjectMatch = m.subject === subject;
+        const recipientMatch = (m.toRecipients || []).some(
+          (r: any) => r.emailAddress?.address?.toLowerCase() === recipientEmail.toLowerCase()
+        );
+        return subjectMatch && recipientMatch;
+      }) || msgs[0]; // fallback to most recent
+
+      if (match) {
+        graphMessageId = match.id || null;
+        internetMessageId = match.internetMessageId || null;
+        conversationId = match.conversationId || null;
         console.log(`Retrieved sent message metadata: graphId=${graphMessageId}, internetMsgId=${internetMessageId}, convId=${conversationId}`);
       } else {
         console.warn("No sent message found in Sent Items after sendMail");
@@ -147,5 +193,6 @@ export async function sendEmailViaGraph(
     graphMessageId,
     internetMessageId,
     conversationId,
+    sentAsUser,
   };
 }

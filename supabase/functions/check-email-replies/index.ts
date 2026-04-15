@@ -86,36 +86,14 @@ Deno.serve(async (req) => {
     let totalRepliesFound = 0;
     const processedConversations: string[] = [];
 
-    // Get unique sender emails to check their inboxes
-    const senderEmails = new Set<string>();
-    // We need profiles to map owner UUIDs to emails
-    const ownerIds = [...new Set(sentEmails.map(e => e.owner || e.created_by).filter(Boolean))];
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select('id, "Email ID"')
-      .in("id", ownerIds);
-
-    const ownerEmailMap = new Map<string, string>();
-    for (const p of profiles || []) {
-      if (p["Email ID"]) {
-        ownerEmailMap.set(p.id, p["Email ID"]);
-        senderEmails.add(p["Email ID"]);
-      }
-    }
-
-    // Also add the shared mailbox
-    senderEmails.add(azureConfig.senderEmail);
+    // Always poll the shared mailbox since that's where emails are sent from
+    const sharedMailbox = azureConfig.senderEmail;
 
     for (const [convId, emails] of conversationMap.entries()) {
-      // Determine which mailbox to check
-      const primaryEmail = emails[0];
-      const ownerId = primaryEmail.owner || primaryEmail.created_by;
-      const senderEmail = ownerEmailMap.get(ownerId || "") || azureConfig.senderEmail;
-
       try {
-        // Query Graph for messages in this conversation from the inbox
+        // Query Graph for messages in this conversation from the shared mailbox inbox
         const filter = encodeURIComponent(`conversationId eq '${convId}'`);
-        const graphUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/mailFolders/inbox/messages?$filter=${filter}&$orderby=receivedDateTime desc&$top=20&$select=id,subject,from,receivedDateTime,internetMessageId,conversationId,bodyPreview`;
+        const graphUrl = `https://graph.microsoft.com/v1.0/users/${sharedMailbox}/mailFolders/inbox/messages?$filter=${filter}&$orderby=receivedDateTime desc&$top=20&$select=id,subject,from,receivedDateTime,internetMessageId,conversationId,bodyPreview`;
 
         const graphResp = await fetch(graphUrl, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -123,7 +101,7 @@ Deno.serve(async (req) => {
 
         if (!graphResp.ok) {
           const errText = await graphResp.text();
-          console.error(`Graph inbox query failed for ${senderEmail}, conv ${convId}: ${graphResp.status} ${errText}`);
+          console.error(`Graph inbox query failed for ${sharedMailbox}, conv ${convId}: ${graphResp.status} ${errText}`);
           continue;
         }
 
@@ -138,13 +116,12 @@ Deno.serve(async (req) => {
           if (allInternetMsgIds.has(msgInternetId)) continue;
           if (existingSyncedIds.has(msgInternetId)) continue;
 
-          // This is a new reply! Insert it as a campaign communication
+          // This is a new reply!
           const fromEmail = msg.from?.emailAddress?.address || "";
           const fromName = msg.from?.emailAddress?.name || fromEmail;
           const receivedAt = msg.receivedDateTime || new Date().toISOString();
 
-          // Find the original email this reply is associated with
-          const originalEmail = emails[0]; // Use the first (most recent) sent email in this conversation
+          const originalEmail = emails[0];
 
           const { error: insertErr } = await supabase
             .from("campaign_communications")
@@ -188,7 +165,7 @@ Deno.serve(async (req) => {
               .update({
                 replied_at: receivedAt,
                 last_reply_at: receivedAt,
-                reply_count: 1, // Will be incremented properly if multiple replies
+                reply_count: 1,
               })
               .eq("internet_message_id", originalEmail.internet_message_id);
           }
