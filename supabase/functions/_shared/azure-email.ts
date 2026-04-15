@@ -74,11 +74,13 @@ export async function sendEmailViaGraph(
     toRecipients: [{ emailAddress: { address: recipientEmail, name: recipientName } }],
   };
 
-  // If fromEmail is provided and different from the mailbox, set the from field
-  // This requires "Send As" or "Send on Behalf" permission in Exchange Admin
-  if (fromEmail && fromEmail.toLowerCase() !== senderEmail.toLowerCase()) {
-    message.from = { emailAddress: { address: fromEmail } };
-  }
+  // Note: Setting a "from" address different from the mailbox requires
+  // "Send As" or "Send on Behalf" permission in Exchange Admin.
+  // Currently disabled because the Azure app lacks this permission.
+  // To enable: grant "Send As" rights on the shared mailbox, then uncomment:
+  // if (fromEmail && fromEmail.toLowerCase() !== senderEmail.toLowerCase()) {
+  //   message.from = { emailAddress: { address: fromEmail } };
+  // }
 
   const sendResp = await fetch(sendUrl, {
     method: "POST",
